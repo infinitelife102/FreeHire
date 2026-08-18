@@ -1,0 +1,4 @@
+# Leftover URL lists — keep the directory, ignore the files.
+*
+!.gitkeep
+!.gitignore

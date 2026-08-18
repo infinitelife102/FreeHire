@@ -1,0 +1,4 @@
+# Generated daily registers — keep the directory, ignore the files.
+*
+!.gitkeep
+!.gitignore

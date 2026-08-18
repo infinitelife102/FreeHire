@@ -4,6 +4,9 @@
 Auth is not required — GET /api/v1/jobs/search is public.
 This script is self-contained (stdlib only) and can be copied anywhere.
 
+Each output line is `posted_at<TAB>url` (posted_at may be empty).
+By default only the previous calendar day in America/New_York is kept;
+the file starts with `# date:` / `# timezone:`.
 Filters match the freehire job-search API / SPA query vocabulary
 (docs/API.md § Filtering jobs, internal/search StringFacets).
 
@@ -23,17 +26,17 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 DEFAULT_BASE = "https://freehire.me"
 PAGE_SIZE = 100  # API max is 100
 MAX_WINDOW = 10_000  # API hard stop: offset + limit ≤ 10000
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-# Timestamped URL lists land here (created on first run if missing).
-OUTPUT_DIR = SCRIPT_DIR / "urls"
+# Timestamped URL dumps from this script only (not the day-register folder).
+EXPORT_DIR = SCRIPT_DIR / "exports"
 
 # Mirrors internal/search.StringFacets keys (equality facets).
 STRING_FACETS = (
@@ -80,6 +83,8 @@ SEARCH_EXTRAS = (
 PAGINATION_KEYS = frozenset({"limit", "offset"})
 
 # Used only when the caller passes no filters at all.
+# posted_within_days is the API window (wide enough for yesterday morning).
+# The calendar cut is --date (default: yesterday in America/New_York), not this number.
 DEFAULT_FILTERS: dict[str, str] = {
     "work_mode": "remote",
     "category": "software_engineering,backend,frontend,fullstack,mobile,devops",
@@ -88,10 +93,304 @@ DEFAULT_FILTERS: dict[str, str] = {
     "semantic_ratio": "0",
 }
 
+DEFAULT_TZ_NAME = "America/New_York"
 
-def default_output_path() -> Path:
+
+class JobRow(NamedTuple):
+    url: str
+    posted_at: str  # RFC3339 from the API, or "" when the row has none
+
+
+def default_output_path(day: date | None = None) -> Path:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return OUTPUT_DIR / f"job_urls_{stamp}.txt"
+    if day is None:
+        return EXPORT_DIR / f"job_urls_{stamp}.txt"
+    return EXPORT_DIR / f"job_urls_{day.isoformat()}_{stamp[9:]}.txt"
+
+
+def format_job_line(row: JobRow) -> str:
+    """One export line: posted_at, tab, apply URL."""
+    return f"{row.posted_at}\t{row.url}"
+
+
+def parse_job_line(raw: str) -> JobRow | None:
+    """Parse one export line (`posted_at\\turl` or a bare URL)."""
+    line = raw.strip()
+    if not line or line.startswith("#"):
+        return None
+    if "\t" in line:
+        posted_at, url = line.split("\t", 1)
+        url = url.strip()
+        if not url:
+            return None
+        return JobRow(url=url, posted_at=posted_at.strip())
+    return JobRow(url=line, posted_at="")
+
+
+class _USEastern(tzinfo):
+    """America/New_York using US DST rules (2007–). Used when zoneinfo has no tzdata.
+
+    fromutc is required: datetime.astimezone / datetime.now(tz) convert through
+    UTC, and the default tzinfo.fromutc treats that UTC wall clock as local,
+    which shifts the November fallback by five hours and can move the calendar
+    day (2026-11-01 04:30 UTC is 00:30 EDT, not 23:30 EDT the night before).
+    """
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        return timedelta(hours=-4) if self.dst(dt) else timedelta(hours=-5)
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        if dt is None:
+            return timedelta(0)
+        # fold=1 is the second 1am on the November fallback day (standard time).
+        if dt.fold == 1:
+            return timedelta(0)
+        return timedelta(hours=1) if _us_eastern_is_dst(dt) else timedelta(0)
+
+    def tzname(self, dt: datetime | None) -> str:
+        return "EDT" if self.dst(dt) else "EST"
+
+    def fromutc(self, dt: datetime) -> datetime:
+        if dt.tzinfo is not self:
+            raise ValueError("fromutc: dt.tzinfo is not self")
+        utc = dt.replace(tzinfo=None)
+        start = datetime.combine(_nth_sunday(utc.year, 3, 2), datetime.min.time()).replace(
+            hour=7
+        )
+        end = datetime.combine(_nth_sunday(utc.year, 11, 1), datetime.min.time()).replace(
+            hour=6
+        )
+        is_dst = start <= utc < end
+        local = utc + timedelta(hours=-4 if is_dst else -5)
+        fold = 0
+        if not is_dst:
+            repeat = datetime.combine(_nth_sunday(utc.year, 11, 1), datetime.min.time()).replace(
+                hour=1
+            )
+            if repeat <= local < repeat.replace(hour=2):
+                fold = 1
+        return local.replace(tzinfo=self, fold=fold)
+
+
+def _nth_sunday(year: int, month: int, n: int) -> date:
+    first = date(year, month, 1)
+    first_sun = 1 + (6 - first.weekday()) % 7
+    return date(year, month, first_sun + 7 * (n - 1))
+
+
+def _us_eastern_is_dst(dt: datetime) -> bool:
+    """True when *local* Eastern wall time is in DST (2am March–2am November)."""
+    local = dt.replace(tzinfo=None) if dt.tzinfo else dt
+    start = datetime.combine(_nth_sunday(local.year, 3, 2), datetime.min.time()).replace(hour=2)
+    end = datetime.combine(_nth_sunday(local.year, 11, 1), datetime.min.time()).replace(hour=2)
+    return start <= local < end
+
+
+def tz_from_offset(hours: int) -> timezone:
+    if not -14 <= hours <= 14:
+        raise SystemExit("--tz-offset must be between -14 and 14")
+    return timezone(timedelta(hours=hours))
+
+
+def utc_offset_from_label(label: str) -> int | None:
+    """Parse a `UTC+9` / `UTC-5` / `UTC` label. None if not that shape."""
+    if label == "UTC":
+        return 0
+    if not label.startswith("UTC") or len(label) < 4 or label[3] not in "+-":
+        return None
+    try:
+        hours = int(label[3:])
+    except ValueError:
+        return None
+    if not -14 <= hours <= 14:
+        return None
+    return hours
+
+
+def resolve_tz(name: str | None, offset: int | None) -> tuple[tzinfo, str]:
+    if offset is not None:
+        return tz_from_offset(offset), f"UTC{offset:+d}"
+    label = name or DEFAULT_TZ_NAME
+    parsed = utc_offset_from_label(label)
+    if parsed is not None:
+        return tz_from_offset(parsed), label
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(label), label
+    except Exception:
+        if label in {"America/New_York", "US/Eastern"}:
+            return _USEastern(), label
+        raise SystemExit(
+            f"unknown timezone {label!r}: pass --tz-offset or use America/New_York"
+        )
+
+
+def effective_tz(
+    name: str | None,
+    offset: int | None,
+    header_label: str | None = None,
+) -> tuple[tzinfo, str]:
+    """CLI offset, then CLI name, then an export `# timezone:`, then New York."""
+    if offset is not None:
+        return resolve_tz(None, offset)
+    if name:
+        return resolve_tz(name, None)
+    if header_label:
+        return resolve_tz(header_label, None)
+    return resolve_tz(DEFAULT_TZ_NAME, None)
+
+
+def parse_posted_at(raw: str) -> datetime | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def calendar_day(posted_at: str, tz: tzinfo) -> date | None:
+    dt = parse_posted_at(posted_at)
+    if dt is None:
+        return None
+    return dt.astimezone(tz).date()
+
+
+def yesterday(tz: tzinfo) -> date:
+    return datetime.now(tz).date() - timedelta(days=1)
+
+
+def parse_date_arg(raw: str) -> date:
+    try:
+        return date.fromisoformat(raw)
+    except ValueError as e:
+        raise SystemExit(f"--date must be YYYY-MM-DD or all, got {raw!r}") from e
+
+
+def days_needed_for(target: date, tz: tzinfo) -> int:
+    """Minimum posted_within_days so a morning run still covers target 00:00."""
+    today = datetime.now(tz).date()
+    delta = (today - target).days
+    if delta < 0:
+        raise SystemExit(f"--date {target.isoformat()} is in the future")
+    return delta + 1
+
+
+def ensure_posted_window(filters: dict[str, str], target: date, tz: tzinfo) -> dict[str, str]:
+    need = str(days_needed_for(target, tz))
+    have = filters.get("posted_within_days")
+    out = dict(filters)
+    if have is None or not have.isdigit() or int(have) < int(need):
+        if have is not None and have != need:
+            print(
+                f"posted_within_days={have} is too narrow for {target.isoformat()}; "
+                f"using {need}",
+                file=sys.stderr,
+            )
+        out["posted_within_days"] = need
+    return out
+
+
+def filter_by_day(rows: list[JobRow], target: date, tz: tzinfo) -> tuple[list[JobRow], int]:
+    kept: list[JobRow] = []
+    undated = 0
+    for row in rows:
+        day = calendar_day(row.posted_at, tz)
+        if day is None:
+            undated += 1
+            continue
+        if day == target:
+            kept.append(row)
+    kept.sort(key=lambda r: (r.posted_at, r.url))
+    return kept, undated
+
+
+def resolve_target_date(raw: str | None, tz: tzinfo) -> date | None:
+    """None means no calendar cut (`--date all`). Empty/default is yesterday."""
+    if raw is None or raw == "":
+        return yesterday(tz)
+    if raw == "all":
+        return None
+    return parse_date_arg(raw)
+
+
+def date_file_header(day: date, tz_label: str) -> str:
+    return f"# date: {day.isoformat()}\n# timezone: {tz_label}\n\n"
+
+
+def parse_export_header(text: str) -> tuple[date | None, str | None]:
+    """Read `# date:` / `# timezone:` from the leading comment block of an export."""
+    day: date | None = None
+    tz_label: str | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if not line.startswith("#"):
+            break
+        key, _, value = line[1:].partition(":")
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "date" and value:
+            try:
+                day = date.fromisoformat(value)
+            except ValueError as e:
+                raise SystemExit(f"invalid # date: {value!r}") from e
+        elif key == "timezone" and value:
+            tz_label = value
+    return day, tz_label
+
+
+def rows_for_calendar_day(
+    rows: list[JobRow],
+    target: date,
+    tz: tzinfo,
+    *,
+    keep_undated: bool = False,
+) -> tuple[list[JobRow], int]:
+    """Keep rows whose posted_at falls on target.
+
+    When keep_undated is set and every row lacks a usable posted_at (a legacy
+    bare-URL export), the whole list is treated as already being that day.
+    """
+    kept, undated = filter_by_day(rows, target, tz)
+    if keep_undated and rows and undated == len(rows):
+        return list(rows), undated
+    return kept, undated
+
+
+def warn_if_window_truncated(
+    total: int,
+    rows: list[JobRow],
+    target: date | None,
+    tz: tzinfo,
+) -> None:
+    if total <= MAX_WINDOW:
+        return
+    print(
+        f"warning: api window caps at {MAX_WINDOW}; {total - MAX_WINDOW} matches were not fetched",
+        file=sys.stderr,
+    )
+    if target is None:
+        return
+    oldest: date | None = None
+    for row in rows:
+        day = calendar_day(row.posted_at, tz)
+        if day is not None and (oldest is None or day < oldest):
+            oldest = day
+    if oldest is not None and oldest > target:
+        print(
+            f"warning: newest {MAX_WINDOW} matches only reach back to {oldest.isoformat()}; "
+            f"{target.isoformat()} was not fetched",
+            file=sys.stderr,
+        )
 
 
 def parse_query_string(raw: str) -> dict[str, str]:
@@ -232,14 +531,14 @@ def strip_freehire_utm(raw: str) -> str:
     )
 
 
-def collect_urls(
+def collect_jobs(
     base: str,
     filters: dict[str, str],
     page_size: int = PAGE_SIZE,
     *,
     keep_utm: bool = False,
-) -> tuple[list[str], int]:
-    urls: list[str] = []
+) -> tuple[list[JobRow], int]:
+    rows: list[JobRow] = []
     offset = 0
     total = None
 
@@ -272,25 +571,34 @@ def collect_urls(
 
         for job in data:
             u = job.get("url")
-            if u:
-                urls.append(u if keep_utm else strip_freehire_utm(u))
+            if not u:
+                continue
+            posted = job.get("posted_at") or ""
+            if not isinstance(posted, str):
+                posted = str(posted)
+            rows.append(
+                JobRow(
+                    url=u if keep_utm else strip_freehire_utm(u),
+                    posted_at=posted,
+                )
+            )
 
         offset += len(data)
-        print(f"fetched {offset}/{total} rows (urls so far={len(urls)})", file=sys.stderr)
+        print(f"fetched {offset}/{total} rows (jobs so far={len(rows)})", file=sys.stderr)
 
         if offset >= total:
             break
         time.sleep(0.2)
 
     seen: set[str] = set()
-    unique: list[str] = []
-    for u in urls:
-        if u not in seen:
-            seen.add(u)
-            unique.append(u)
-    if len(unique) != len(urls):
+    unique: list[JobRow] = []
+    for row in rows:
+        if row.url not in seen:
+            seen.add(row.url)
+            unique.append(row)
+    if len(unique) != len(rows):
         print(
-            f"deduped apply urls: {len(urls)} → {len(unique)}",
+            f"deduped apply urls: {len(rows)} → {len(unique)}",
             file=sys.stderr,
         )
     return unique, total or 0
@@ -305,7 +613,7 @@ def main() -> None:
         "-o",
         "--output",
         default=None,
-        help="output text file (default: urls/job_urls_YYYYMMDD_HHMMSS.txt)",
+        help="output text file (default: exports/job_urls_YYYY-MM-DD_HHMMSS.txt)",
     )
     p.add_argument("--base-url", default=DEFAULT_BASE, help=f"API origin (default: {DEFAULT_BASE})")
     p.add_argument("--page-size", type=int, default=PAGE_SIZE, help=f"page size 1–100 (default: {PAGE_SIZE})")
@@ -319,38 +627,76 @@ def main() -> None:
         action="store_true",
         help="print resolved filters and exit (no request)",
     )
+    p.add_argument(
+        "--date",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="keep only this calendar day (default: yesterday in America/New_York; `all` = no date cut)",
+    )
+    p.add_argument(
+        "--tz",
+        default=DEFAULT_TZ_NAME,
+        metavar="NAME",
+        help=f"IANA timezone for --date (default: {DEFAULT_TZ_NAME})",
+    )
+    p.add_argument(
+        "--tz-offset",
+        type=int,
+        default=None,
+        metavar="H",
+        help="hours east of UTC; overrides --tz when set",
+    )
     add_filter_arguments(p)
     args = p.parse_args()
 
     if not 1 <= args.page_size <= 100:
         raise SystemExit("--page-size must be between 1 and 100")
 
+    tz, tz_label = resolve_tz(args.tz, args.tz_offset)
+    target = resolve_target_date(args.date, tz)
     filters = filters_from_args(args)
+    if target is not None:
+        filters = ensure_posted_window(filters, target, tz)
+        if "sort" not in filters:
+            filters["sort"] = "posted_at"
+
     if args.print_filters:
         for k, v in sorted(filters.items()):
             print(f"{k}={v}")
+        print(f"date={target.isoformat() if target else 'all'}")
+        print(f"timezone={tz_label}")
         return
 
-    out = Path(args.output) if args.output else default_output_path()
+    out = Path(args.output) if args.output else default_output_path(target)
     if not out.is_absolute():
-        # Relative -o paths land in urls/, not the caller's cwd.
-        out = OUTPUT_DIR / out
+        # Relative -o paths land in exports/, not the caller's cwd.
+        out = EXPORT_DIR / out
 
-    urls, total = collect_urls(
+    rows, total = collect_jobs(
         args.base_url, filters, args.page_size, keep_utm=args.keep_utm
     )
+    warn_if_window_truncated(total, rows, target, tz)
+    if target is not None:
+        rows, undated = filter_by_day(rows, target, tz)
+        if undated:
+            print(f"skipped {undated} rows with no usable posted_at", file=sys.stderr)
+
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(urls))
-        if urls:
+        if target is not None:
+            f.write(date_file_header(target, tz_label))
+        f.write("\n".join(format_job_line(row) for row in rows))
+        if rows:
             f.write("\n")
 
-    print(f"wrote {len(urls)} urls (api total={total}) → {out}", file=sys.stderr)
-    if total > MAX_WINDOW:
+    if target is not None:
         print(
-            f"warning: api window caps at {MAX_WINDOW}; {total - MAX_WINDOW} matches were not fetched",
+            f"wrote {len(rows)} jobs for {target.isoformat()} ({tz_label}) "
+            f"(api total={total}) → {out}",
             file=sys.stderr,
         )
+    else:
+        print(f"wrote {len(rows)} jobs (api total={total}) → {out}", file=sys.stderr)
 
 
 if __name__ == "__main__":
