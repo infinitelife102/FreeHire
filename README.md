@@ -217,6 +217,16 @@ https://freehire.me/api/v1/jobs` needs no credential. All responses use
 **Full reference — every endpoint, its parameters, auth mode and the whole
 search-filter vocabulary: [freehire.me/docs/api](https://freehire.me/docs/api).**
 
+## Export job URLs
+
+The `export-job-urls/` folder holds standalone Python scripts that query the
+public search API and write apply URLs to a text file — no sign-in, API key, or
+local stack required. Filters match the website and API; a companion script can
+turn a day's export into a numbered register.
+
+Details, filters, and how to run with Python or [uv](https://docs.astral.sh/uv/):
+**[export-job-urls/README.md](export-job-urls/README.md)**.
+
 ## Sources
 
 Live catalogue snapshot — **3,300,615 open postings** across **294,282 companies**,

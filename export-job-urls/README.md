@@ -13,7 +13,7 @@ Filter parameter names match the freehire **job search API / SPA** (`GET /api/v1
 
 ## Requirements
 
-- Python 3.9+ (no extra packages)
+- Python 3.9+ (no extra packages), **or** [uv](https://docs.astral.sh/uv/) to run without a separate Python install
 - Network access to `https://freehire.me` (or the host given with `--base-url`)
 
 ## Quick start
@@ -22,6 +22,18 @@ Filter parameter names match the freehire **job search API / SPA** (`GET /api/v1
 cd export-job-urls
 python export_job_urls.py
 ```
+
+### With uv (no Python on PATH)
+
+[uv](https://docs.astral.sh/uv/) downloads a Python interpreter on first run and needs no extra packages — useful on Windows when `python` is missing or only the Microsoft Store stub is installed:
+
+```bash
+cd export-job-urls
+uv run export_job_urls.py
+uv run day_register.py
+```
+
+Optional: pin a version on first run — `uv run --python 3.12 export_job_urls.py`. Every flag and filter below works the same; substitute `uv run` for `python` in any example.
 
 With no filters on the command line, the built-in defaults are used:
 
@@ -128,7 +140,7 @@ python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&coun
 ## Use anywhere (copy this folder)
 
 1. Copy the whole `export-job-urls/` folder (`export_job_urls.py` and `day_register.py`).
-2. Run `python export_job_urls.py ...` or `python day_register.py` from that location.
+2. Run `python export_job_urls.py ...` or `python day_register.py` from that location (or `uv run export_job_urls.py` / `uv run day_register.py` if you use uv).
 
 Each script writes next to itself, not the current working directory, and creates its folder on first run:
 
