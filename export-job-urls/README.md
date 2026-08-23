@@ -180,3 +180,9 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 - Tracking UTM is stripped by default; ATS links work without it.
 - API window limit: `offset + limit ≤ 10000`. Both scripts warn when the
   newest 10000 matches do not reach back to `--date`.
+
+## Git (fork + `feat/export-job-urls`)
+
+If you work from a fork and track `strelov1/freehire` as `upstream`, see
+**[git-fork-workflow.md](git-fork-workflow.md)** for syncing `main`, rebasing
+this branch, and pushing with `--force-with-lease`.
