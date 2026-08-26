@@ -68,9 +68,9 @@ python day_register.py --from exports/job_urls_20260818_000819.txt --date 2026-0
 
 Writes two files and does not touch leftover content on a later run:
 
-| File | Role |
-|---|---|
-| `day-register/register/YYYY-MM-DD.txt` | `# date` / `# timezone`, then URLs in 10s, `# count: N` |
+| File                                   | Role                                                         |
+| -------------------------------------- | ------------------------------------------------------------ |
+| `day-register/register/YYYY-MM-DD.txt` | `# date` / `# timezone`, then URLs in 10s, `# count: N`      |
 | `day-register/leftover/YYYY-MM-DD.txt` | Created empty (comment only). Paste URLs you did not finish. |
 
 ## Filters (same as the website / API)
@@ -127,8 +127,8 @@ Other search params:
 `--q`, `--sort`, `--order`, `--semantic-ratio`, `--visa-sponsorship`,
 `--salary-min`, `--salary-max`, `--experience-years-min`, `--posted-within-days`
 
-Precedence: **CLI flags > `--query` > `--from-url`**.  
-If **no** filter flags / `--query` / `--from-url` are set, `DEFAULT_FILTERS` at the top of the script is used.  
+Precedence: **CLI flags >** `--query` **>** `--from-url`.
+If **no** filter flags / `--query` / `--from-url` are set, `DEFAULT_FILTERS` at the top of the script is used.
 Passing any filter replaces that default set entirely (it does not merge onto remote/US/3-day).
 
 Print the resolved filters without calling the API:
@@ -151,26 +151,26 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 
 ## Other options
 
-| Option | Meaning |
-| --- | --- |
-| `-o PATH` | Output path (relative paths are under `exports/`) |
-| `--base-url URL` | API origin (default `https://freehire.me`) |
-| `--page-size N` | Page size 1–100 (default 100) |
-| `--keep-utm` | Keep `?utm_source=freehire.me` |
-| `--print-filters` | Print resolved filters and exit |
+| Option              | Meaning                                                         |
+| ------------------- | --------------------------------------------------------------- |
+| `-o PATH`           | Output path (relative paths are under `exports/`)               |
+| `--base-url URL`    | API origin (default `https://freehire.me`)                      |
+| `--page-size N`     | Page size 1–100 (default 100)                                   |
+| `--keep-utm`        | Keep `?utm_source=freehire.me`                                  |
+| `--print-filters`   | Print resolved filters and exit                                 |
 | `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut) |
-| `--tz NAME` | IANA timezone for `--date` (default `America/New_York`) |
-| `--tz-offset H` | Hours east of UTC; overrides `--tz` |
+| `--tz NAME`         | IANA timezone for `--date` (default `America/New_York`)         |
+| `--tz-offset H`     | Hours east of UTC; overrides `--tz`                             |
 
 `day_register.py` extras:
 
-| Option | Meaning |
-|---|---|
-| `--date YYYY-MM-DD` | Register this day (default: `# date:` from `--from`, else yesterday) |
-| `--tz NAME` | IANA timezone (default: `# timezone:` from `--from`, else `America/New_York`) |
-| `--tz-offset H` | Hours east of UTC; overrides `--tz` and the export header |
-| `--from PATH` | Read an export file instead of calling the API |
-| `--block-size N` | URLs per paragraph (default 10) |
+| Option              | Meaning                                                                       |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `--date YYYY-MM-DD` | Register this day (default: `# date:` from `--from`, else yesterday)          |
+| `--tz NAME`         | IANA timezone (default: `# timezone:` from `--from`, else `America/New_York`) |
+| `--tz-offset H`     | Hours east of UTC; overrides `--tz` and the export header                     |
+| `--from PATH`       | Read an export file instead of calling the API                                |
+| `--block-size N`    | URLs per paragraph (default 10)                                               |
 
 ## Notes
 
