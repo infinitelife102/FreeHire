@@ -87,7 +87,7 @@ PAGINATION_KEYS = frozenset({"limit", "offset"})
 # The calendar cut is --date (default: yesterday in America/New_York), not this number.
 DEFAULT_FILTERS: dict[str, str] = {
     "work_mode": "remote",
-    "category": "software_engineering,backend,frontend,fullstack,mobile,devops",
+    "category": "software_engineering,backend,frontend,fullstack,mobile",
     "countries": "us",
     "posted_within_days": "3",
     "semantic_ratio": "0",

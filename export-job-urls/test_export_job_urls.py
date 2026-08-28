@@ -4,13 +4,21 @@
 from __future__ import annotations
 
 import io
+import os
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from day_register import load_export_file
+from day_register import (
+    SLACK_WEBHOOK_ENV,
+    load_dotenv,
+    load_export_file,
+    resolve_slack_webhook,
+    slack_texts,
+    url_blocks,
+)
 from export_job_urls import (
     MAX_WINDOW,
     JobRow,
@@ -171,6 +179,59 @@ class LoadExportFileTests(unittest.TestCase):
         self.assertEqual([r.url for r in rows], ["https://x.test/a"])
         self.assertEqual(day, date(2026, 8, 17))
         self.assertEqual(tz_label, "UTC")
+
+
+class SlackRegisterTests(unittest.TestCase):
+    def test_url_blocks_match_file_paragraphs(self) -> None:
+        rows = [JobRow(f"https://x.test/{i}", "") for i in range(12)]
+        blocks = url_blocks(rows, 10)
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(blocks[0].count("\n"), 9)
+        self.assertEqual(blocks[1], "https://x.test/10\nhttps://x.test/11")
+
+    def test_slack_texts_header_then_each_block(self) -> None:
+        rows = [JobRow("https://x.test/a", ""), JobRow("https://x.test/b", "")]
+        texts = slack_texts(rows, 10, date(2026, 8, 25), "America/New_York")
+        self.assertEqual(texts[0], "register 2026-08-25 (America/New_York) — 2 jobs")
+        self.assertEqual(texts[1], "https://x.test/a\nhttps://x.test/b")
+
+    def test_slack_texts_header_only_when_empty(self) -> None:
+        texts = slack_texts([], 10, date(2026, 8, 25), "America/New_York")
+        self.assertEqual(texts, ["register 2026-08-25 (America/New_York) — 0 jobs"])
+
+    def test_resolve_slack_webhook_env_and_flags(self) -> None:
+        with patch.dict("os.environ", {SLACK_WEBHOOK_ENV: "https://hooks.example/x"}, clear=False):
+            self.assertEqual(
+                resolve_slack_webhook(None, required=False, disabled=False),
+                "https://hooks.example/x",
+            )
+            self.assertIsNone(resolve_slack_webhook(None, required=False, disabled=True))
+        self.assertEqual(
+            resolve_slack_webhook("https://hooks.example/cli", required=True, disabled=False),
+            "https://hooks.example/cli",
+        )
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop(SLACK_WEBHOOK_ENV, None)
+            with self.assertRaises(SystemExit):
+                resolve_slack_webhook(None, required=True, disabled=False, env_file=Path("/no/.env"))
+
+    def test_dotenv_file_supplies_webhook(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env"
+            path.write_text(
+                f'# comment\n{SLACK_WEBHOOK_ENV}="https://hooks.example/file"\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                load_dotenv(path)[SLACK_WEBHOOK_ENV],
+                "https://hooks.example/file",
+            )
+            with patch.dict("os.environ", {}, clear=False):
+                os.environ.pop(SLACK_WEBHOOK_ENV, None)
+                self.assertEqual(
+                    resolve_slack_webhook(None, required=True, disabled=False, env_file=path),
+                    "https://hooks.example/file",
+                )
 
 
 if __name__ == "__main__":
