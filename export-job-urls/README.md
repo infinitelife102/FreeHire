@@ -39,7 +39,7 @@ With no filters on the command line, the built-in defaults are used:
 
 - `work_mode=remote`
 - `countries=us`
-- `category=software_engineering,backend,frontend,fullstack,mobile,devops`
+- `category=software_engineering,backend,frontend,fullstack,mobile`
 - `semantic_ratio=0`
 - **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip)
 - `posted_within_days=3` is only the API fetch window, then the date cut is applied
@@ -73,6 +73,83 @@ Writes two files and does not touch leftover content on a later run:
 | `day-register/register/YYYY-MM-DD.txt` | `# date` / `# timezone`, then URLs in 10s, `# count: N`      |
 | `day-register/leftover/YYYY-MM-DD.txt` | Created empty (comment only). Paste URLs you did not finish. |
 
+### Slack (`#plan_list`)
+
+After the register file is written, `day_register.py` can post the **same 10-URL
+paragraphs** to Slack. The script never takes a channel name: the Incoming
+Webhook URL is bound to one channel when you create it. Make that channel
+`#plan_list`.
+
+#### 1. Channel
+
+In Slack: **Channels → Create → Create a channel**, name `plan_list`.
+For a private channel, you must already be a member before you can attach a webhook.
+
+#### 2. Slack app + Incoming Webhook
+
+1. Open [https://api.slack.com/apps](https://api.slack.com/apps) → **Create New App**.
+2. Choose **Blank app** (not AI agent / Starter app / From a manifest).
+3. Name it (e.g. `day-register`), pick the workspace, create it.
+4. Left sidebar: **Features → Incoming Webhooks** → **Activate Incoming Webhooks** On.
+5. **Add New Webhook to Workspace** → select **`plan_list`** → **Allow**.
+6. Copy the URL under **Webhook URLs for Your Workspace**:
+   `https://hooks.slack.com/services/T…/B…/…`  
+   Anyone with this URL can post to that channel. Do not commit it or paste it in chat.
+
+A workspace admin may have to allow app installs.
+
+#### 3. Test the webhook (Windows PowerShell)
+
+Slack’s docs use Unix single quotes; those break in cmd/PowerShell
+(`Could not resolve host: application`, Slack `invalid_payload`). Use `curl.exe`
+and double quotes around the header:
+
+```powershell
+curl.exe -X POST -H "Content-Type: application/json" --data '{"text":"Hello, World!"}' "https://hooks.slack.com/services/T.../B.../..."
+```
+
+`#plan_list` should show `Hello, World!` from the app. Hover the message → **⋮** →
+**Delete message** to remove a test post (Incoming Webhooks cannot delete; a
+workspace that only allows “delete own messages” needs an admin).
+
+#### 4. Put the URL in `.env`
+
+In `export-job-urls/`, copy `.env.example` to `.env` (gitignored) and paste the
+real URL. No extra packages; `day_register.py` reads this file itself.
+
+```
+DAY_REGISTER_SLACK_WEBHOOK=https://hooks.slack.com/services/T.../B.../...
+```
+
+Precedence: `--slack-webhook` → process env → `.env`.
+
+#### 5. Post the day’s list
+
+```bash
+cd export-job-urls
+python day_register.py --slack
+```
+
+`--slack` writes the register file first, then posts, and **exits non-zero if
+the webhook is missing** so a forgotten `.env` cannot look like a successful
+post. If `.env` (or the env var) is already set, `python day_register.py` with
+no flags also posts. `--no-slack` writes the files only.
+
+What appears in `#plan_list`:
+
+1. `register YYYY-MM-DD (America/New_York) — N jobs`
+2. One Slack message per paragraph of 10 URLs (same blocks as
+   `day-register/register/YYYY-MM-DD.txt`)
+
+About 178 URLs → header + 18 messages. To post an already-built register without
+calling the API again:
+
+```bash
+python day_register.py --from day-register/register/2026-08-25.txt --date 2026-08-25 --slack
+```
+
+A file of bare URLs (no `posted_at`) is treated as that day’s list.
+
 ## Filters (same as the website / API)
 
 ### 1) Paste a URL from the site
@@ -80,7 +157,7 @@ Writes two files and does not touch leftover content on a later run:
 Pass a freehire search URL from the browser, or an API search URL:
 
 ```bash
-python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&category=software_engineering,backend,frontend,fullstack,mobile,devops&countries=us&posted_within_days=3"
+python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&category=software_engineering,backend,frontend,fullstack,mobile&countries=us&posted_within_days=3"
 ```
 
 ```bash
@@ -171,6 +248,9 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 | `--tz-offset H`     | Hours east of UTC; overrides `--tz` and the export header                     |
 | `--from PATH`       | Read an export file instead of calling the API                                |
 | `--block-size N`    | URLs per paragraph (default 10)                                               |
+| `--slack`           | Post to Slack; fail if no webhook                                             |
+| `--no-slack`        | Do not post even if `DAY_REGISTER_SLACK_WEBHOOK` is set                       |
+| `--slack-webhook`   | Incoming Webhook URL (default: `$DAY_REGISTER_SLACK_WEBHOOK`)                 |
 
 ## Notes
 

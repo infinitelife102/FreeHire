@@ -12,12 +12,21 @@ Usage:
   python day_register.py --date 2026-08-15
   python day_register.py --from exports/job_urls_2026-08-17_000819.txt
   python day_register.py --from exports/job_urls_20260818_000819.txt --date 2026-08-15
+
+Slack (#plan_list or whatever channel the webhook is bound to):
+  put DAY_REGISTER_SLACK_WEBHOOK in .env (see README), or pass --slack-webhook
+  python day_register.py --slack
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
+import time
+import urllib.error
+import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -45,6 +54,31 @@ REGISTER_DIR = DAY_DIR / "register"
 LEFTOVER_DIR = DAY_DIR / "leftover"
 
 BLOCK_SIZE = 10
+SLACK_WEBHOOK_ENV = "DAY_REGISTER_SLACK_WEBHOOK"
+ENV_FILE = SCRIPT_DIR / ".env"
+# Incoming webhooks allow one post per second; stay under that between blocks.
+SLACK_POST_GAP_SECONDS = 0.4
+
+
+def load_dotenv(path: Path) -> dict[str, str]:
+    """KEY=VALUE lines from a local .env. No interpolation; optional quotes."""
+    if not path.is_file():
+        return {}
+    out: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key:
+            out[key] = value
+    return out
 
 
 def load_export_file(path: Path) -> tuple[list[JobRow], date | None, str | None]:
@@ -63,16 +97,77 @@ def load_export_file(path: Path) -> tuple[list[JobRow], date | None, str | None]
     return rows, header_day, header_tz
 
 
-def format_register(rows: list[JobRow], block_size: int, day: date, tz_label: str) -> str:
+def url_blocks(rows: list[JobRow], block_size: int) -> list[str]:
+    """The same 10-URL paragraphs the register file and Slack both use."""
     chunks: list[str] = []
     for i in range(0, len(rows), block_size):
         block = rows[i : i + block_size]
         chunks.append("\n".join(row.url for row in block))
+    return chunks
+
+
+def format_register(rows: list[JobRow], block_size: int, day: date, tz_label: str) -> str:
+    chunks = url_blocks(rows, block_size)
     body = "\n\n".join(chunks)
     header = f"# date: {day.isoformat()}\n# timezone: {tz_label}\n\n"
     if body:
         body += "\n\n"
     return header + body + f"# count: {len(rows)}\n"
+
+
+def slack_texts(rows: list[JobRow], block_size: int, day: date, tz_label: str) -> list[str]:
+    """One header, then one Slack message per register paragraph."""
+    header = f"register {day.isoformat()} ({tz_label}) — {len(rows)} jobs"
+    return [header, *url_blocks(rows, block_size)]
+
+
+def post_slack(webhook: str, texts: list[str]) -> None:
+    if not webhook.startswith(("https://", "http://")):
+        raise SystemExit("Slack webhook must be an http(s) URL")
+    for i, text in enumerate(texts):
+        payload = json.dumps({"text": text}).encode("utf-8")
+        req = urllib.request.Request(
+            webhook,
+            data=payload,
+            headers={"Content-Type": "application/json", "User-Agent": "freehire-day-register/1.0"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                resp.read()
+        except urllib.error.HTTPError as e:
+            raise SystemExit(
+                f"Slack HTTP {e.code}: {e.read().decode('utf-8', errors='replace')}"
+            ) from e
+        except urllib.error.URLError as e:
+            raise SystemExit(f"Slack request failed: {e}") from e
+        if i + 1 < len(texts):
+            time.sleep(SLACK_POST_GAP_SECONDS)
+
+
+def resolve_slack_webhook(
+    explicit: str | None,
+    *,
+    required: bool,
+    disabled: bool,
+    env_file: Path | None = None,
+) -> str | None:
+    """CLI flag, then the process env, then export-job-urls/.env."""
+    if disabled:
+        return None
+    webhook = (explicit or os.environ.get(SLACK_WEBHOOK_ENV) or "").strip()
+    if not webhook:
+        webhook = load_dotenv(env_file if env_file is not None else ENV_FILE).get(
+            SLACK_WEBHOOK_ENV, ""
+        ).strip()
+    if webhook:
+        return webhook
+    if required:
+        raise SystemExit(
+            "--slack needs a webhook: put "
+            f"{SLACK_WEBHOOK_ENV} in .env, set the env var, or pass --slack-webhook"
+        )
+    return None
 
 
 def leftover_header(day: date, tz_label: str) -> str:
@@ -151,6 +246,22 @@ def main() -> None:
         action="store_true",
         help="keep ?utm_source=freehire.me (stripped by default)",
     )
+    p.add_argument(
+        "--slack",
+        action="store_true",
+        help="post the register to Slack (requires webhook; fails if missing)",
+    )
+    p.add_argument(
+        "--no-slack",
+        action="store_true",
+        help=f"do not post even if {SLACK_WEBHOOK_ENV} is set",
+    )
+    p.add_argument(
+        "--slack-webhook",
+        default=None,
+        metavar="URL",
+        help=f"Incoming Webhook URL (default: ${SLACK_WEBHOOK_ENV})",
+    )
     add_filter_arguments(p)
     args = p.parse_args()
 
@@ -209,6 +320,14 @@ def main() -> None:
         file=sys.stderr,
     )
     print(f"leftover: {leftover_state} → {leftover_path}", file=sys.stderr)
+
+    webhook = resolve_slack_webhook(
+        args.slack_webhook, required=args.slack, disabled=args.no_slack
+    )
+    if webhook:
+        messages = slack_texts(kept, args.block_size, target, tz_label)
+        post_slack(webhook, messages)
+        print(f"slack: posted {len(messages)} messages", file=sys.stderr)
 
 
 if __name__ == "__main__":
