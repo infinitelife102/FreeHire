@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -94,6 +95,293 @@ DEFAULT_FILTERS: dict[str, str] = {
 }
 
 DEFAULT_TZ_NAME = "America/New_York"
+
+# Country names only (not cities). "Sydney, Australia" drops via Australia;
+# bare "Remote" / "New York" / empty names no foreign country and is kept.
+# "georgia" and "palestine" are omitted — they collide with US places.
+# "new mexico" is the US state; it maps to us so "mexico" cannot claim that span.
+# Longer names claim their span first so "united states" wins over "us".
+_COUNTRY_NAME_TO_CODE: dict[str, str] = {
+    "united states of america": "us",
+    "united states": "us",
+    "new mexico": "us",
+    "estados unidos": "us",
+    "vereinigte staaten": "us",
+    "u.s.a.": "us",
+    "u.s.": "us",
+    "usa": "us",
+    "us": "us",
+    "puerto rico": "us",
+    "united kingdom": "gb",
+    "great britain": "gb",
+    "reino unido": "gb",
+    "vereinigtes königreich": "gb",
+    "england": "gb",
+    "britain": "gb",
+    "u.k.": "gb",
+    "uk": "gb",
+    "united arab emirates": "ae",
+    "emiratos árabes unidos": "ae",
+    "emirados árabes unidos": "ae",
+    "vereinigte arabische emirate": "ae",
+    "uae": "ae",
+    "saudi arabia": "sa",
+    "arabia saudita": "sa",
+    "arábia saudita": "sa",
+    "saudi-arabien": "sa",
+    "south korea": "kr",
+    "corea del sur": "kr",
+    "coreia do sul": "kr",
+    "südkorea": "kr",
+    "korea": "kr",
+    "hong kong": "hk",
+    "new zealand": "nz",
+    "south africa": "za",
+    "czech republic": "cz",
+    "dominican republic": "do",
+    "the netherlands": "nl",
+    "netherlands": "nl",
+    "países bajos": "nl",
+    "niederlande": "nl",
+    "sri lanka": "lk",
+    "costa rica": "cr",
+    "el salvador": "sv",
+    "north macedonia": "mk",
+    "bosnia and herzegovina": "ba",
+    "ivory coast": "ci",
+    "côte d'ivoire": "ci",
+    "cote d'ivoire": "ci",
+    "brunei darussalam": "bn",
+    "palestinian territories": "ps",
+    "state of palestine": "ps",
+    "australia": "au",
+    "austria": "at",
+    "germany": "de",
+    "deutschland": "de",
+    "alemania": "de",
+    "alemanha": "de",
+    "france": "fr",
+    "francia": "fr",
+    "frança": "fr",
+    "frankreich": "fr",
+    "spain": "es",
+    "españa": "es",
+    "espanha": "es",
+    "spanien": "es",
+    "italy": "it",
+    "italia": "it",
+    "italien": "it",
+    "sweden": "se",
+    "sverige": "se",
+    "suecia": "se",
+    "schweden": "se",
+    "poland": "pl",
+    "polonia": "pl",
+    "polónia": "pl",
+    "polen": "pl",
+    "ireland": "ie",
+    "irland": "ie",
+    "portugal": "pt",
+    "switzerland": "ch",
+    "suiza": "ch",
+    "suíça": "ch",
+    "schweiz": "ch",
+    "belgium": "be",
+    "belgien": "be",
+    "denmark": "dk",
+    "danmark": "dk",
+    "dänemark": "dk",
+    "finland": "fi",
+    "suomi": "fi",
+    "finnland": "fi",
+    "norway": "no",
+    "norge": "no",
+    "norwegen": "no",
+    "ukraine": "ua",
+    "canada": "ca",
+    "singapore": "sg",
+    "japan": "jp",
+    "japón": "jp",
+    "japão": "jp",
+    "india": "in",
+    "argentina": "ar",
+    "brazil": "br",
+    "brasil": "br",
+    "mexico": "mx",
+    "méxico": "mx",
+    "israel": "il",
+    "china": "cn",
+    "greece": "gr",
+    "grecia": "gr",
+    "grécia": "gr",
+    "griechenland": "gr",
+    "philippines": "ph",
+    "filipinas": "ph",
+    "philippinen": "ph",
+    "colombia": "co",
+    "cyprus": "cy",
+    "taiwan": "tw",
+    "malaysia": "my",
+    "malasia": "my",
+    "romania": "ro",
+    "rumanía": "ro",
+    "roménia": "ro",
+    "rumänien": "ro",
+    "hungary": "hu",
+    "hungría": "hu",
+    "hungria": "hu",
+    "ungarn": "hu",
+    "bulgaria": "bg",
+    "bulgarien": "bg",
+    "thailand": "th",
+    "tailandia": "th",
+    "indonesia": "id",
+    "indonesien": "id",
+    "vietnam": "vn",
+    "turkey": "tr",
+    "türkiye": "tr",
+    "turquía": "tr",
+    "turquia": "tr",
+    "türkei": "tr",
+    "egypt": "eg",
+    "egipto": "eg",
+    "egito": "eg",
+    "ägypten": "eg",
+    "lebanon": "lb",
+    "qatar": "qa",
+    "kuwait": "kw",
+    "bahrain": "bh",
+    "oman": "om",
+    "jordan": "jo",
+    "iraq": "iq",
+    "iran": "ir",
+    "morocco": "ma",
+    "algeria": "dz",
+    "tunisia": "tn",
+    "pakistan": "pk",
+    "bangladesh": "bd",
+    "nepal": "np",
+    "peru": "pe",
+    "perú": "pe",
+    "chile": "cl",
+    "uruguay": "uy",
+    "ecuador": "ec",
+    "bolivia": "bo",
+    "paraguay": "py",
+    "venezuela": "ve",
+    "panama": "pa",
+    "guatemala": "gt",
+    "nigeria": "ng",
+    "kenya": "ke",
+    "ghana": "gh",
+    "ethiopia": "et",
+    "czechia": "cz",
+    "tschechien": "cz",
+    "serbia": "rs",
+    "croatia": "hr",
+    "slovenia": "si",
+    "slovakia": "sk",
+    "lithuania": "lt",
+    "latvia": "lv",
+    "estonia": "ee",
+    "luxembourg": "lu",
+    "iceland": "is",
+    "malta": "mt",
+    "monaco": "mc",
+    "albania": "al",
+    "montenegro": "me",
+    "kosovo": "xk",
+    "mauritius": "mu",
+    "andorra": "ad",
+    "angola": "ao",
+    "brunei": "bn",
+    "cameroon": "cm",
+    "honduras": "hn",
+    "cambodia": "kh",
+    "laos": "la",
+    "liechtenstein": "li",
+    "libya": "ly",
+    "myanmar": "mm",
+    "burma": "mm",
+    "mongolia": "mn",
+    "macao": "mo",
+    "macau": "mo",
+    "mozambique": "mz",
+    "nicaragua": "ni",
+    "rwanda": "rw",
+    "san marino": "sm",
+    "senegal": "sn",
+    "tanzania": "tz",
+    "uganda": "ug",
+    "yemen": "ye",
+    "zambia": "zm",
+    "zimbabwe": "zw",
+    "russia": "ru",
+    "uzbekistan": "uz",
+    "kazakhstan": "kz",
+    "kyrgyzstan": "kg",
+    "tajikistan": "tj",
+    "turkmenistan": "tm",
+    "belarus": "by",
+    "moldova": "md",
+    "armenia": "am",
+    "azerbaijan": "az",
+}
+
+_COUNTRY_NAME_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])"), code)
+    for name, code in sorted(_COUNTRY_NAME_TO_CODE.items(), key=lambda kv: -len(kv[0]))
+]
+
+
+def requested_country_codes(filters: dict[str, str]) -> frozenset[str]:
+    """ISO codes from the `countries` search filter, or empty when unset.
+
+    Aliases use the same table as location matching (`usa`, `United States`,
+    `uk` → us/gb). An unrecognized token is kept as-is so a raw ISO code
+    like `de` still matches a location that resolved to that code.
+    """
+    raw = filters.get("countries") or ""
+    codes: set[str] = set()
+    for part in raw.split(","):
+        token = part.strip().casefold()
+        if not token:
+            continue
+        codes.add(_COUNTRY_NAME_TO_CODE.get(token, token))
+    return frozenset(codes)
+
+
+def location_names_other_country(location: str, keep: frozenset[str]) -> bool:
+    """True when location names a country outside `keep` and none inside it.
+
+    Bare Remote / a US city / an empty string name no country and stay.
+    "Spain / United States" names a keep-country and stays.
+    """
+    if not keep or not location.strip():
+        return False
+    named = countries_named_in(location)
+    if not named:
+        return False
+    return named.isdisjoint(keep)
+
+
+def countries_named_in(location: str) -> set[str]:
+    """ISO codes of country names that appear as whole words in location.
+
+    Patterns are longest-first; a shorter name inside an already-claimed span
+    is skipped ("New Mexico" is us, not mx).
+    """
+    text = location.casefold()
+    found: set[str] = set()
+    claimed: list[tuple[int, int]] = []
+    for pattern, code in _COUNTRY_NAME_PATTERNS:
+        for match in pattern.finditer(text):
+            start, end = match.span()
+            if any(start < claimed_end and end > claimed_start for claimed_start, claimed_end in claimed):
+                continue
+            claimed.append((start, end))
+            found.add(code)
+    return found
 
 
 class JobRow(NamedTuple):
@@ -541,6 +829,8 @@ def collect_jobs(
     rows: list[JobRow] = []
     offset = 0
     total = None
+    keep_countries = requested_country_codes(filters)
+    dropped_other_country = 0
 
     print(
         "filters: " + urllib.parse.urlencode(filters).replace("%2C", ","),
@@ -573,6 +863,12 @@ def collect_jobs(
             u = job.get("url")
             if not u:
                 continue
+            loc = job.get("location") or ""
+            if not isinstance(loc, str):
+                loc = str(loc)
+            if location_names_other_country(loc, keep_countries):
+                dropped_other_country += 1
+                continue
             posted = job.get("posted_at") or ""
             if not isinstance(posted, str):
                 posted = str(posted)
@@ -599,6 +895,12 @@ def collect_jobs(
     if len(unique) != len(rows):
         print(
             f"deduped apply urls: {len(rows)} → {len(unique)}",
+            file=sys.stderr,
+        )
+    if dropped_other_country:
+        print(
+            f"dropped {dropped_other_country} jobs whose location names a "
+            f"country outside countries={','.join(sorted(keep_countries))}",
             file=sys.stderr,
         )
     return unique, total or 0
