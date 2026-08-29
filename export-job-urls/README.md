@@ -43,6 +43,7 @@ With no filters on the command line, the built-in defaults are used:
 - `semantic_ratio=0`
 - **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip)
 - `posted_within_days=3` is only the API fetch window, then the date cut is applied
+- After the API match, a job whose `location` names a country **outside** `countries` is dropped (role-cluster geography can tag a Spain listing `us`). Bare `Remote` / a US city / empty location is kept
 
 Output file: `exports/job_urls_YYYY-MM-DD_HHMMSS.txt` (header + `posted_at<TAB>url`).
 
@@ -53,8 +54,9 @@ python day_register.py
 ```
 
 Default: **previous calendar day in America/New_York** (EST/EDT), same search
-filters as `export_job_urls.py`. The register file starts with `# date:` and
-`# timezone:`.
+filters as `export_job_urls.py` — including the location post-filter that drops
+a posting whose `location` names a country outside `countries=us`. The register
+file starts with `# date:` and `# timezone:`.
 
 ```bash
 python day_register.py --date 2026-08-15

@@ -24,14 +24,106 @@ from export_job_urls import (
     JobRow,
     _USEastern,
     calendar_day,
+    collect_jobs,
+    countries_named_in,
     effective_tz,
+    location_names_other_country,
     parse_export_header,
     parse_job_line,
+    requested_country_codes,
     resolve_tz,
     rows_for_calendar_day,
     utc_offset_from_label,
     warn_if_window_truncated,
 )
+
+
+class LocationCountryFilterTests(unittest.TestCase):
+    keep_us = frozenset({"us"})
+
+    def test_drops_named_foreign_country(self) -> None:
+        self.assertTrue(location_names_other_country("Spain", self.keep_us))
+        self.assertTrue(location_names_other_country("Sydney, Australia", self.keep_us))
+        self.assertTrue(location_names_other_country("Vietnam", self.keep_us))
+        self.assertTrue(location_names_other_country("China", self.keep_us))
+
+    def test_keeps_remote_empty_and_us_city(self) -> None:
+        for loc in ("", "Remote", "New York, NY", "United States", "Remote - US"):
+            self.assertFalse(
+                location_names_other_country(loc, self.keep_us), loc
+            )
+
+    def test_keeps_when_us_is_also_named(self) -> None:
+        self.assertFalse(
+            location_names_other_country("Spain / United States", self.keep_us)
+        )
+
+    def test_keeps_ambiguous_us_place_names(self) -> None:
+        self.assertFalse(location_names_other_country("Georgia", self.keep_us))
+        self.assertFalse(location_names_other_country("Indiana", self.keep_us))
+
+    def test_keeps_new_mexico_not_mexico(self) -> None:
+        for loc in ("New Mexico", "Remote - New Mexico", "Albuquerque, New Mexico"):
+            self.assertFalse(location_names_other_country(loc, self.keep_us), loc)
+        self.assertEqual(countries_named_in("New Mexico"), {"us"})
+        self.assertTrue(location_names_other_country("Mexico", self.keep_us))
+        self.assertTrue(location_names_other_country("Mexico City", self.keep_us))
+
+    def test_no_filter_without_requested_countries(self) -> None:
+        self.assertFalse(location_names_other_country("Spain", frozenset()))
+        self.assertEqual(requested_country_codes({}), frozenset())
+        self.assertEqual(requested_country_codes({"countries": "us"}), frozenset({"us"}))
+
+    def test_requested_country_aliases(self) -> None:
+        self.assertEqual(requested_country_codes({"countries": "usa"}), frozenset({"us"}))
+        self.assertEqual(requested_country_codes({"countries": "United States"}), frozenset({"us"}))
+        self.assertEqual(requested_country_codes({"countries": "UK"}), frozenset({"gb"}))
+        self.assertEqual(requested_country_codes({"countries": "de"}), frozenset({"de"}))
+        self.assertEqual(requested_country_codes({"countries": "us,ca"}), frozenset({"us", "ca"}))
+        self.assertFalse(
+            location_names_other_country(
+                "United States", requested_country_codes({"countries": "usa"})
+            )
+        )
+        self.assertFalse(
+            location_names_other_country(
+                "United Kingdom", requested_country_codes({"countries": "uk"})
+            )
+        )
+
+    def test_countries_named_in(self) -> None:
+        self.assertEqual(countries_named_in("Sydney, Australia"), {"au"})
+        self.assertEqual(countries_named_in("Remote"), set())
+        self.assertEqual(countries_named_in("United States"), {"us"})
+
+    def test_collect_jobs_drops_foreign_location(self) -> None:
+        page = {
+            "meta": {"total": 3},
+            "data": [
+                {
+                    "url": "https://jobs.ashbyhq.com/bjakcareer/spain",
+                    "location": "Spain",
+                    "posted_at": "2026-08-27T06:09:08Z",
+                },
+                {
+                    "url": "https://jobs.ashbyhq.com/bjakcareer/sydney",
+                    "location": "Sydney, Australia",
+                    "posted_at": "2026-08-27T06:13:12Z",
+                },
+                {
+                    "url": "https://jobs.ashbyhq.com/acme/us",
+                    "location": "Remote",
+                    "posted_at": "2026-08-27T12:00:00Z",
+                },
+            ],
+        }
+        with patch("export_job_urls.fetch_page", return_value=page):
+            with patch("sys.stderr", io.StringIO()):
+                rows, total = collect_jobs(
+                    "https://freehire.me", {"countries": "us"}, page_size=100
+                )
+        self.assertEqual(total, 3)
+        self.assertEqual([r.url for r in rows], ["https://jobs.ashbyhq.com/acme/us"])
 
 
 class ParseExportHeaderTests(unittest.TestCase):
