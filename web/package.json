@@ -58,7 +58,7 @@
     "easymde": "^2.21.0",
     "flag-icons": "^7.5.0",
     "freehire-design-system": "link:../design-system",
-    "isomorphic-dompurify": "^3.22.0",
+    "isomorphic-dompurify": "^3.23.0",
     "marked": "^18.0.9",
     "posthog-js": "^1.417.1",
     "satori": "^0.29.0",
