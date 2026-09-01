@@ -27,6 +27,7 @@ from export_job_urls import (
     collect_jobs,
     countries_named_in,
     effective_tz,
+    format_job_line,
     location_names_other_country,
     parse_export_header,
     parse_job_line,
@@ -114,6 +115,7 @@ class LocationCountryFilterTests(unittest.TestCase):
                     "url": "https://jobs.ashbyhq.com/acme/us",
                     "location": "Remote",
                     "posted_at": "2026-08-27T12:00:00Z",
+                    "created_at": "2026-08-27T11:00:00Z",
                 },
             ],
         }
@@ -124,6 +126,7 @@ class LocationCountryFilterTests(unittest.TestCase):
                 )
         self.assertEqual(total, 3)
         self.assertEqual([r.url for r in rows], ["https://jobs.ashbyhq.com/acme/us"])
+        self.assertEqual(rows[0].created_at, "2026-08-27T11:00:00Z")
 
 
 class ParseExportHeaderTests(unittest.TestCase):
@@ -167,9 +170,82 @@ class RowsForCalendarDayTests(unittest.TestCase):
         self.assertEqual([r.url for r in kept], ["https://x.test/a", "https://x.test/b"])
         self.assertEqual(undated, 2)
 
+    def test_drops_posted_at_bump_when_created_at_is_older(self) -> None:
+        rows = [
+            JobRow(
+                "https://job-boards.greenhouse.io/specterops/jobs/8621096002",
+                "2026-08-31T14:08:48Z",
+                "2026-07-06T16:49:29Z",
+            ),
+            JobRow(
+                "https://x.test/new",
+                "2026-08-31T12:00:00Z",
+                "2026-08-31T11:00:00Z",
+            ),
+        ]
+        buf = io.StringIO()
+        with patch("sys.stderr", buf):
+            kept, undated = rows_for_calendar_day(rows, date(2026, 8, 31), self.tz)
+        self.assertEqual([r.url for r in kept], ["https://x.test/new"])
+        self.assertEqual(undated, 0)
+        self.assertIn("dropped 1 jobs whose created_at is before 2026-08-31", buf.getvalue())
+
+    def test_keeps_when_created_at_is_after_target(self) -> None:
+        # posted evening, first ingest after midnight — not a Greenhouse bump.
+        rows = [
+            JobRow(
+                "https://x.test/late",
+                "2026-08-31T03:30:00Z",
+                "2026-09-01T05:00:00Z",
+            )
+        ]
+        buf = io.StringIO()
+        with patch("sys.stderr", buf):
+            kept, undated = rows_for_calendar_day(rows, date(2026, 8, 31), self.tz)
+        self.assertEqual([r.url for r in kept], ["https://x.test/late"])
+        self.assertEqual(undated, 0)
+        self.assertEqual(buf.getvalue(), "")
+
+    def test_keeps_legacy_row_without_created_at(self) -> None:
+        rows = [JobRow("https://x.test/a", "2026-08-17T12:00:00Z")]
+        kept, undated = rows_for_calendar_day(rows, date(2026, 8, 17), self.tz)
+        self.assertEqual([r.url for r in kept], ["https://x.test/a"])
+        self.assertEqual(undated, 0)
+
     def test_parse_job_line_bare_url(self) -> None:
         row = parse_job_line("https://x.test/a")
         self.assertEqual(row, JobRow(url="https://x.test/a", posted_at=""))
+
+    def test_parse_and_format_three_column_line(self) -> None:
+        raw = "2026-08-31T14:08:48Z\t2026-07-06T16:49:29Z\thttps://x.test/a"
+        row = parse_job_line(raw)
+        self.assertEqual(
+            row,
+            JobRow(
+                url="https://x.test/a",
+                posted_at="2026-08-31T14:08:48Z",
+                created_at="2026-07-06T16:49:29Z",
+            ),
+        )
+        self.assertEqual(format_job_line(row), raw)
+
+    def test_parse_job_line_two_column_legacy(self) -> None:
+        row = parse_job_line("2026-08-31T14:08:48Z\thttps://x.test/a")
+        self.assertEqual(
+            row, JobRow(url="https://x.test/a", posted_at="2026-08-31T14:08:48Z")
+        )
+
+    def test_parse_job_line_empty_created_at_is_not_a_bump(self) -> None:
+        raw = "2026-08-31T12:00:00Z\t\thttps://x.test/a"
+        row = parse_job_line(raw)
+        self.assertEqual(
+            row,
+            JobRow(url="https://x.test/a", posted_at="2026-08-31T12:00:00Z", created_at=""),
+        )
+        kept, undated = rows_for_calendar_day([row], date(2026, 8, 31), self.tz)
+        self.assertEqual([r.url for r in kept], ["https://x.test/a"])
+        self.assertEqual(undated, 0)
+        self.assertEqual(format_job_line(row), raw)
 
 
 class WarnIfWindowTruncatedTests(unittest.TestCase):

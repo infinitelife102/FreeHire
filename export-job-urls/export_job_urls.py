@@ -4,8 +4,9 @@
 Auth is not required — GET /api/v1/jobs/search is public.
 This script is self-contained (stdlib only) and can be copied anywhere.
 
-Each output line is `posted_at<TAB>url` (posted_at may be empty).
-By default only the previous calendar day in America/New_York is kept;
+Each output line is `posted_at<TAB>created_at<TAB>url` (either timestamp may be empty).
+By default only the previous calendar day in America/New_York is kept
+(posted_at on that day; an earlier created_at is a posted_at bump and is dropped);
 the file starts with `# date:` / `# timezone:`.
 Filters match the freehire job-search API / SPA query vocabulary
 (docs/API.md § Filtering jobs, internal/search StringFacets).
@@ -86,9 +87,17 @@ PAGINATION_KEYS = frozenset({"limit", "offset"})
 # Used only when the caller passes no filters at all.
 # posted_within_days is the API window (wide enough for yesterday morning).
 # The calendar cut is --date (default: yesterday in America/New_York), not this number.
+# Category is product-engineering plus the adjacent IC work that still
+# looks like building software: devops (platform/cloud), data pipelines,
+# and applying models in product (RAG/agents). SRE/QA/security/architecture
+# and the science/analytics/training ML buckets stay out — different bid.
+# Hybrid/onsite stay out — those are not bid-from-anywhere roles.
 DEFAULT_FILTERS: dict[str, str] = {
     "work_mode": "remote",
-    "category": "software_engineering,backend,frontend,fullstack,mobile",
+    "category": (
+        "software_engineering,backend,frontend,fullstack,mobile,"
+        "devops,data_engineering,ai_engineering"
+    ),
     "countries": "us",
     "posted_within_days": "3",
     "semantic_ratio": "0",
@@ -387,6 +396,7 @@ def countries_named_in(location: str) -> set[str]:
 class JobRow(NamedTuple):
     url: str
     posted_at: str  # RFC3339 from the API, or "" when the row has none
+    created_at: str = ""  # first ingest time; empty on legacy two-column exports
 
 
 def default_output_path(day: date | None = None) -> Path:
@@ -397,22 +407,30 @@ def default_output_path(day: date | None = None) -> Path:
 
 
 def format_job_line(row: JobRow) -> str:
-    """One export line: posted_at, tab, apply URL."""
-    return f"{row.posted_at}\t{row.url}"
+    """One export line: posted_at, created_at, apply URL."""
+    return f"{row.posted_at}\t{row.created_at}\t{row.url}"
 
 
 def parse_job_line(raw: str) -> JobRow | None:
-    """Parse one export line (`posted_at\\turl` or a bare URL)."""
+    """Parse one export line (`posted_at\\tcreated_at\\turl`, `posted_at\\turl`, or a bare URL)."""
     line = raw.strip()
     if not line or line.startswith("#"):
         return None
-    if "\t" in line:
-        posted_at, url = line.split("\t", 1)
+    if "\t" not in line:
+        return JobRow(url=line, posted_at="")
+    posted_at, rest = line.split("\t", 1)
+    posted_at = posted_at.strip()
+    if "\t" in rest:
+        created_at, url = rest.split("\t", 1)
+        created_at = created_at.strip()
         url = url.strip()
         if not url:
             return None
-        return JobRow(url=url, posted_at=posted_at.strip())
-    return JobRow(url=line, posted_at="")
+        return JobRow(url=url, posted_at=posted_at, created_at=created_at)
+    url = rest.strip()
+    if not url:
+        return None
+    return JobRow(url=url, posted_at=posted_at)
 
 
 class _USEastern(tzinfo):
@@ -587,16 +605,35 @@ def ensure_posted_window(filters: dict[str, str], target: date, tz: tzinfo) -> d
 
 
 def filter_by_day(rows: list[JobRow], target: date, tz: tzinfo) -> tuple[list[JobRow], int]:
+    """Keep rows whose posted_at falls on target.
+
+    An earlier created_at is a source `updated_at` bump (Greenhouse), not a new
+    posting, and is dropped. A created_at on or after target is kept — ingest
+    can cross midnight without making the job a bump. A missing created_at
+    (legacy two-column export) is not a bump; posted_at alone decides.
+    """
     kept: list[JobRow] = []
     undated = 0
+    bumped = 0
     for row in rows:
         day = calendar_day(row.posted_at, tz)
         if day is None:
             undated += 1
             continue
-        if day == target:
-            kept.append(row)
+        if day != target:
+            continue
+        created_day = calendar_day(row.created_at, tz)
+        if created_day is not None and created_day < target:
+            bumped += 1
+            continue
+        kept.append(row)
     kept.sort(key=lambda r: (r.posted_at, r.url))
+    if bumped:
+        print(
+            f"dropped {bumped} jobs whose created_at is before {target.isoformat()} "
+            f"(posted_at bump)",
+            file=sys.stderr,
+        )
     return kept, undated
 
 
@@ -643,7 +680,7 @@ def rows_for_calendar_day(
     *,
     keep_undated: bool = False,
 ) -> tuple[list[JobRow], int]:
-    """Keep rows whose posted_at falls on target.
+    """Keep rows whose posted_at falls on target (drop an earlier created_at bump).
 
     When keep_undated is set and every row lacks a usable posted_at (a legacy
     bare-URL export), the whole list is treated as already being that day.
@@ -872,10 +909,14 @@ def collect_jobs(
             posted = job.get("posted_at") or ""
             if not isinstance(posted, str):
                 posted = str(posted)
+            created = job.get("created_at") or ""
+            if not isinstance(created, str):
+                created = str(created)
             rows.append(
                 JobRow(
                     url=u if keep_utm else strip_freehire_utm(u),
                     posted_at=posted,
+                    created_at=created,
                 )
             )
 
