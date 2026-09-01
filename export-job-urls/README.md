@@ -2,10 +2,13 @@
 
 Fetch apply URLs for jobs that match a freehire search filter and write them to a text file.
 
-Each export line is `posted_at<TAB>url`. By default only **yesterday in
-America/New_York** is kept, and the file starts with `# date:` / `# timezone:`.
-`day_register.py` turns that day's list into a register (paragraphs of 10, count
-at the end) plus an empty leftover file.
+Each export line is `posted_at<TAB>created_at<TAB>url`. By default only
+**yesterday in America/New_York** is kept — `posted_at` must fall on that day.
+An earlier `created_at` is a source `updated_at` bump (Greenhouse) and is
+dropped; a later `created_at` (ingest after midnight) is kept.
+The file starts with `# date:` / `# timezone:`. `day_register.py` turns that
+day's list into a register (paragraphs of 10, count at the end) plus an empty
+leftover file.
 
 No sign-in, API key, local database, or other freehire code is required. The script uses only the Python 3 standard library.
 
@@ -39,13 +42,13 @@ With no filters on the command line, the built-in defaults are used:
 
 - `work_mode=remote`
 - `countries=us`
-- `category=software_engineering,backend,frontend,fullstack,mobile`
+- `category=software_engineering,backend,frontend,fullstack,mobile,devops,data_engineering,ai_engineering`
 - `semantic_ratio=0`
-- **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip)
+- **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip). A job whose `posted_at` is that day but `created_at` is earlier is a date bump and is dropped
 - `posted_within_days=3` is only the API fetch window, then the date cut is applied
 - After the API match, a job whose `location` names a country **outside** `countries` is dropped (role-cluster geography can tag a Spain listing `us`). Bare `Remote` / a US city / empty location is kept
 
-Output file: `exports/job_urls_YYYY-MM-DD_HHMMSS.txt` (header + `posted_at<TAB>url`).
+Output file: `exports/job_urls_YYYY-MM-DD_HHMMSS.txt` (header + `posted_at<TAB>created_at<TAB>url`).
 
 ### Daily register (yesterday → keep → leftover)
 
@@ -54,9 +57,10 @@ python day_register.py
 ```
 
 Default: **previous calendar day in America/New_York** (EST/EDT), same search
-filters as `export_job_urls.py` — including the location post-filter that drops
-a posting whose `location` names a country outside `countries=us`. The register
-file starts with `# date:` and `# timezone:`.
+filters and date cut as `export_job_urls.py` — including the location post-filter
+that drops a posting whose `location` names a country outside `countries=us`,
+and dropping a `posted_at` bump whose `created_at` is an earlier day. The
+register file starts with `# date:` and `# timezone:`.
 
 ```bash
 python day_register.py --date 2026-08-15
@@ -159,7 +163,7 @@ A file of bare URLs (no `posted_at`) is treated as that day’s list.
 Pass a freehire search URL from the browser, or an API search URL:
 
 ```bash
-python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&category=software_engineering,backend,frontend,fullstack,mobile&countries=us&posted_within_days=3"
+python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&category=software_engineering,backend,frontend,fullstack,mobile,devops,data_engineering,ai_engineering&countries=us&posted_within_days=3"
 ```
 
 ```bash
