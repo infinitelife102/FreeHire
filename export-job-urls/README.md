@@ -7,8 +7,7 @@ Each export line is `posted_at<TAB>created_at<TAB>url`. By default only
 `--new-only` also drops an earlier `created_at` (a source `updated_at` bump);
 a later `created_at` (ingest after midnight) is kept.
 The file starts with `# date:` / `# timezone:`. `day_register.py` turns that
-day's list into a register (paragraphs of 10, count at the end) plus an empty
-leftover file.
+day's list into a register (paragraphs of 10, count at the end).
 
 No sign-in, API key, local database, or other freehire code is required. The script uses only the Python 3 standard library.
 
@@ -50,7 +49,7 @@ With no filters on the command line, the built-in defaults are used:
 
 Output file: `exports/job_urls_YYYY-MM-DD_HHMMSS.txt` (header + `posted_at<TAB>created_at<TAB>url`).
 
-### Daily register (yesterday → keep → leftover)
+### Daily register
 
 ```bash
 python day_register.py
@@ -72,19 +71,27 @@ python day_register.py --from exports/job_urls_20260818_000819.txt --date 2026-0
 `--tz` / `--tz-offset` uses `# timezone:` as well. A file of bare URLs (no
 `posted_at` column) is treated as already being that day's list.
 
-Writes two files and does not touch leftover content on a later run:
+A second run for the same date keeps **one file**: it diffs against URLs
+already recorded for that day and appends only the new ones (`# count` is
+updated). A URL already in the file stays there even if a later fetch
+drops it. When Slack is on, each 10-URL block is posted and then written;
+a failed block leaves the earlier ones recorded, and a retry sends only
+what is still missing.
 
-| File                                   | Role                                                         |
-| -------------------------------------- | ------------------------------------------------------------ |
-| `day-register/register/YYYY-MM-DD.txt` | `# date` / `# timezone`, then URLs in 10s, `# count: N`      |
-| `day-register/leftover/YYYY-MM-DD.txt` | Created empty (comment only). Paste URLs you did not finish. |
+| File                                   | Role                                                               |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `day-register/register/YYYY-MM-DD.txt` | The day’s list: `# date` / `# timezone`, URLs in 10s, `# count: N` |
+
+No new URLs → the file is left as it is, and Slack is not called.
 
 ### Slack (`#plan_list`)
 
-After the register file is written, `day_register.py` can post the **same 10-URL
-paragraphs** to Slack. The script never takes a channel name: the Incoming
-Webhook URL is bound to one channel when you create it. Make that channel
-`#plan_list`.
+`day_register.py` can post **10-URL paragraphs** to Slack. After each
+message succeeds it updates the register, so a later run only posts URLs
+that are not yet in the file.
+The script never takes a channel name: the Incoming Webhook URL is bound to
+one channel when you create it. Make that channel `#plan_list`. A webhook URL
+in `.env` is enough; no other Slack config.
 
 #### 1. Channel
 
@@ -97,9 +104,9 @@ For a private channel, you must already be a member before you can attach a webh
 2. Choose **Blank app** (not AI agent / Starter app / From a manifest).
 3. Name it (e.g. `day-register`), pick the workspace, create it.
 4. Left sidebar: **Features → Incoming Webhooks** → **Activate Incoming Webhooks** On.
-5. **Add New Webhook to Workspace** → select **`plan_list`** → **Allow**.
+5. **Add New Webhook to Workspace** → select `plan_list` → **Allow**.
 6. Copy the URL under **Webhook URLs for Your Workspace**:
-   `https://hooks.slack.com/services/T…/B…/…`  
+   `https://hooks.slack.com/services/T…/B…/…`
    Anyone with this URL can post to that channel. Do not commit it or paste it in chat.
 
 A workspace admin may have to allow app installs.
@@ -136,25 +143,28 @@ cd export-job-urls
 python day_register.py --slack
 ```
 
-`--slack` writes the register file first, then posts, and **exits non-zero if
-the webhook is missing** so a forgotten `.env` cannot look like a successful
-post. If `.env` (or the env var) is already set, `python day_register.py` with
-no flags also posts. `--no-slack` writes the files only.
+`--slack` posts one 10-URL paragraph, writes those URLs, then the next
+paragraph, and **exits non-zero if the webhook is missing** so a forgotten
+`.env` cannot look like a successful post. A Slack failure leaves
+already-posted blocks in the file; a retry sends the rest. A timeout after
+Slack accepted a message can still re-post that one block. If `.env` (or
+the env var) is already set, `python day_register.py` with no flags also
+posts when there is something new. `--no-slack` writes the file only. A
+re-run that finds no new URLs skips Slack even with `--slack`.
 
-What appears in `#plan_list`:
+What appears in `#plan_list`: one Slack message per paragraph of 10 new URLs.
+No header. The day’s file on disk holds the full list.
 
-1. `register YYYY-MM-DD (America/New_York) — N jobs`
-2. One Slack message per paragraph of 10 URLs (same blocks as
-   `day-register/register/YYYY-MM-DD.txt`)
-
-About 178 URLs → header + 18 messages. To post an already-built register without
-calling the API again:
+About 178 URLs on the first run → 18 messages. To build from an
+already-exported dump without calling the API again:
 
 ```bash
-python day_register.py --from day-register/register/2026-08-25.txt --date 2026-08-25 --slack
+python day_register.py --from exports/job_urls_2026-08-25_000819.txt --date 2026-08-25 --slack
 ```
 
-A file of bare URLs (no `posted_at`) is treated as that day’s list.
+`--from` a register that is already on disk for that date posts nothing — those
+URLs are already seen. A file of bare URLs (no `posted_at`) is treated as that
+day's list.
 
 ## Filters (same as the website / API)
 
@@ -228,30 +238,30 @@ python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&coun
 Each script writes next to itself, not the current working directory, and creates its folder on first run:
 
 - `export_job_urls.py` → `exports/` (timestamped dumps)
-- `day_register.py` → `day-register/register/` and `day-register/leftover/`
+- `day_register.py` → `day-register/register/`
 
 Generated files are gitignored; `.gitkeep` keeps the empty directories in version control.
 
 ## Other options
 
-| Option              | Meaning                                                                                         |
-| ------------------- | ----------------------------------------------------------------------------------------------- |
-| `-o PATH`           | Output path (relative paths are under `exports/`)                                               |
-| `--base-url URL`    | API origin (default `https://freehire.me`)                                                      |
-| `--page-size N`     | Page size 1–100 (default 100)                                                                   |
-| `--keep-utm`        | Keep `?utm_source=freehire.me`                                                                  |
-| `--print-filters`   | Print resolved filters, date, timezone, and `new_only`, then exit                               |
-| `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut)                                 |
+| Option              | Meaning                                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| `-o PATH`           | Output path (relative paths are under `exports/`)                                                        |
+| `--base-url URL`    | API origin (default `https://freehire.me`)                                                               |
+| `--page-size N`     | Page size 1–100 (default 100)                                                                            |
+| `--keep-utm`        | Keep `?utm_source=freehire.me`                                                                           |
+| `--print-filters`   | Print resolved filters, date, timezone, and `new_only`, then exit                                        |
+| `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut)                                          |
 | `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day — refused with `--date all` |
-| `--tz NAME`         | IANA timezone for `--date` (default `America/New_York`)                                         |
-| `--tz-offset H`     | Hours east of UTC; overrides `--tz`                                                             |
+| `--tz NAME`         | IANA timezone for `--date` (default `America/New_York`)                                                  |
+| `--tz-offset H`     | Hours east of UTC; overrides `--tz`                                                                      |
 
 `day_register.py` extras:
 
 | Option              | Meaning                                                                       |
 | ------------------- | ----------------------------------------------------------------------------- |
 | `--date YYYY-MM-DD` | Register this day (default: `# date:` from `--from`, else yesterday)          |
-| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day   |
+| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day  |
 | `--tz NAME`         | IANA timezone (default: `# timezone:` from `--from`, else `America/New_York`) |
 | `--tz-offset H`     | Hours east of UTC; overrides `--tz` and the export header                     |
 | `--from PATH`       | Read an export file instead of calling the API                                |
