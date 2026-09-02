@@ -38,6 +38,7 @@ from export_job_urls import (
     effective_tz,
     format_job_line,
     location_names_other_country,
+    order_new_first,
     parse_export_header,
     parse_job_line,
     requested_country_codes,
@@ -205,6 +206,44 @@ class RowsForCalendarDayTests(unittest.TestCase):
         )
         self.assertEqual(undated, 0)
         self.assertEqual(buf.getvalue(), "")
+
+    def test_lists_new_postings_before_bumps(self) -> None:
+        # Bump has an earlier posted_at; without new-first it would sort first.
+        rows = [
+            JobRow(
+                "https://x.test/bump",
+                "2026-08-31T08:00:00Z",
+                "2026-07-06T16:49:29Z",
+            ),
+            JobRow(
+                "https://x.test/new-late",
+                "2026-08-31T20:00:00Z",
+                "2026-08-31T19:00:00Z",
+            ),
+            JobRow(
+                "https://x.test/new-early",
+                "2026-08-31T10:00:00Z",
+                "2026-08-31T09:00:00Z",
+            ),
+            JobRow(
+                "https://x.test/bump-late",
+                "2026-08-31T22:00:00Z",
+                "2026-06-01T00:00:00Z",
+            ),
+        ]
+        kept, undated = rows_for_calendar_day(rows, date(2026, 8, 31), self.tz)
+        self.assertEqual(
+            [r.url for r in kept],
+            [
+                "https://x.test/new-early",
+                "https://x.test/new-late",
+                "https://x.test/bump",
+                "https://x.test/bump-late",
+            ],
+        )
+        self.assertEqual(undated, 0)
+        ordered = order_new_first(list(reversed(rows)), date(2026, 8, 31), self.tz)
+        self.assertEqual([r.url for r in ordered], [r.url for r in kept])
 
     def test_drops_posted_at_bump_when_new_only(self) -> None:
         rows = [
