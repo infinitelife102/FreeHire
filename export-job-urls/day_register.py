@@ -36,6 +36,7 @@ from export_job_urls import (
     PAGE_SIZE,
     JobRow,
     add_filter_arguments,
+    add_new_only_argument,
     collect_jobs,
     effective_tz,
     ensure_posted_window,
@@ -210,6 +211,7 @@ def main() -> None:
         metavar="YYYY-MM-DD",
         help="register this calendar day (default: # date: from --from, else yesterday in America/New_York)",
     )
+    add_new_only_argument(p)
     p.add_argument(
         "--tz",
         default=None,
@@ -301,7 +303,13 @@ def main() -> None:
         )
         warn_if_window_truncated(api_total, rows, target, tz)
 
-    kept, undated = rows_for_calendar_day(rows, target, tz, keep_undated=args.from_file is not None)
+    kept, undated = rows_for_calendar_day(
+        rows,
+        target,
+        tz,
+        keep_undated=args.from_file is not None,
+        drop_bumps=args.new_only,
+    )
     if undated == len(rows) and rows and args.from_file:
         print(
             f"export has no posted_at; keeping all {len(kept)} urls for {target.isoformat()}",

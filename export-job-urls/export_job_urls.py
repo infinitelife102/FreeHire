@@ -6,8 +6,8 @@ This script is self-contained (stdlib only) and can be copied anywhere.
 
 Each output line is `posted_at<TAB>created_at<TAB>url` (either timestamp may be empty).
 By default only the previous calendar day in America/New_York is kept
-(posted_at on that day; an earlier created_at is a posted_at bump and is dropped);
-the file starts with `# date:` / `# timezone:`.
+(`posted_at` on that day). `--new-only` also drops an earlier `created_at`
+(a source `updated_at` bump). The file starts with `# date:` / `# timezone:`.
 Filters match the freehire job-search API / SPA query vocabulary
 (docs/API.md § Filtering jobs, internal/search StringFacets).
 
@@ -95,8 +95,8 @@ PAGINATION_KEYS = frozenset({"limit", "offset"})
 DEFAULT_FILTERS: dict[str, str] = {
     "work_mode": "remote",
     "category": (
-        "software_engineering,backend,frontend,fullstack,mobile,"
-        "devops,data_engineering,ai_engineering"
+        "software_engineering,backend,frontend,fullstack,mobile"
+        # ",devops,data_engineering,ai_engineering"
     ),
     "countries": "us",
     "posted_within_days": "3",
@@ -604,13 +604,20 @@ def ensure_posted_window(filters: dict[str, str], target: date, tz: tzinfo) -> d
     return out
 
 
-def filter_by_day(rows: list[JobRow], target: date, tz: tzinfo) -> tuple[list[JobRow], int]:
+def filter_by_day(
+    rows: list[JobRow],
+    target: date,
+    tz: tzinfo,
+    *,
+    drop_bumps: bool = False,
+) -> tuple[list[JobRow], int]:
     """Keep rows whose posted_at falls on target.
 
-    An earlier created_at is a source `updated_at` bump (Greenhouse), not a new
-    posting, and is dropped. A created_at on or after target is kept — ingest
-    can cross midnight without making the job a bump. A missing created_at
-    (legacy two-column export) is not a bump; posted_at alone decides.
+    With drop_bumps (CLI `--new-only`), an earlier created_at is a source
+    `updated_at` bump (Greenhouse), not a new posting, and is dropped. A
+    created_at on or after target is kept — ingest can cross midnight without
+    making the job a bump. A missing created_at (legacy two-column export) is
+    not a bump; posted_at alone decides. Default is posted_at only.
     """
     kept: list[JobRow] = []
     undated = 0
@@ -622,10 +629,11 @@ def filter_by_day(rows: list[JobRow], target: date, tz: tzinfo) -> tuple[list[Jo
             continue
         if day != target:
             continue
-        created_day = calendar_day(row.created_at, tz)
-        if created_day is not None and created_day < target:
-            bumped += 1
-            continue
+        if drop_bumps:
+            created_day = calendar_day(row.created_at, tz)
+            if created_day is not None and created_day < target:
+                bumped += 1
+                continue
         kept.append(row)
     kept.sort(key=lambda r: (r.posted_at, r.url))
     if bumped:
@@ -644,6 +652,12 @@ def resolve_target_date(raw: str | None, tz: tzinfo) -> date | None:
     if raw == "all":
         return None
     return parse_date_arg(raw)
+
+
+def require_date_for_new_only(new_only: bool, target: date | None) -> None:
+    """`--new-only` compares created_at to --date; `--date all` has no day."""
+    if new_only and target is None:
+        raise SystemExit("--new-only needs a calendar day; do not pass --date all")
 
 
 def date_file_header(day: date, tz_label: str) -> str:
@@ -679,13 +693,15 @@ def rows_for_calendar_day(
     tz: tzinfo,
     *,
     keep_undated: bool = False,
+    drop_bumps: bool = False,
 ) -> tuple[list[JobRow], int]:
-    """Keep rows whose posted_at falls on target (drop an earlier created_at bump).
+    """Keep rows whose posted_at falls on target.
 
+    drop_bumps (`--new-only`) also drops an earlier created_at bump.
     When keep_undated is set and every row lacks a usable posted_at (a legacy
     bare-URL export), the whole list is treated as already being that day.
     """
-    kept, undated = filter_by_day(rows, target, tz)
+    kept, undated = filter_by_day(rows, target, tz, drop_bumps=drop_bumps)
     if keep_undated and rows and undated == len(rows):
         return list(rows), undated
     return kept, undated
@@ -786,6 +802,18 @@ def filters_from_args(args: argparse.Namespace) -> dict[str, str]:
     if not filters:
         return dict(DEFAULT_FILTERS)
     return filters
+
+
+def add_new_only_argument(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--new-only",
+        action="store_true",
+        help=(
+            "keep only first-seen postings: drop a row whose created_at is "
+            "before --date (a Greenhouse posted_at bump). Default keeps every "
+            "row whose posted_at falls on that day"
+        ),
+    )
 
 
 def add_filter_arguments(p: argparse.ArgumentParser) -> None:
@@ -976,6 +1004,7 @@ def main() -> None:
         metavar="YYYY-MM-DD",
         help="keep only this calendar day (default: yesterday in America/New_York; `all` = no date cut)",
     )
+    add_new_only_argument(p)
     p.add_argument(
         "--tz",
         default=DEFAULT_TZ_NAME,
@@ -997,6 +1026,7 @@ def main() -> None:
 
     tz, tz_label = resolve_tz(args.tz, args.tz_offset)
     target = resolve_target_date(args.date, tz)
+    require_date_for_new_only(args.new_only, target)
     filters = filters_from_args(args)
     if target is not None:
         filters = ensure_posted_window(filters, target, tz)
@@ -1008,6 +1038,7 @@ def main() -> None:
             print(f"{k}={v}")
         print(f"date={target.isoformat() if target else 'all'}")
         print(f"timezone={tz_label}")
+        print(f"new_only={'true' if args.new_only else 'false'}")
         return
 
     out = Path(args.output) if args.output else default_output_path(target)
@@ -1020,7 +1051,7 @@ def main() -> None:
     )
     warn_if_window_truncated(total, rows, target, tz)
     if target is not None:
-        rows, undated = filter_by_day(rows, target, tz)
+        rows, undated = filter_by_day(rows, target, tz, drop_bumps=args.new_only)
         if undated:
             print(f"skipped {undated} rows with no usable posted_at", file=sys.stderr)
 
