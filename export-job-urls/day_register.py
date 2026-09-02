@@ -2,7 +2,9 @@
 """Build a per-date job register from yesterday's postings.
 
 Pulls the previous calendar day's jobs (same search filters as export_job_urls.py),
-writes them in paragraphs of 10, and records the count at the end.
+writes them in paragraphs of 10, and records the count at the end. Truly new
+postings (the `--new-only` set) come first; posted_at bumps follow. `--new-only`
+still drops those bumps entirely.
 
 A later run for the same date keeps one file, YYYY-MM-DD.txt. It diffs
 against URLs already in that day's register and appends only the new

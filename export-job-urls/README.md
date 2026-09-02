@@ -7,7 +7,8 @@ Each export line is `posted_at<TAB>created_at<TAB>url`. By default only
 `--new-only` also drops an earlier `created_at` (a source `updated_at` bump);
 a later `created_at` (ingest after midnight) is kept.
 The file starts with `# date:` / `# timezone:`. `day_register.py` turns that
-day's list into a register (paragraphs of 10, count at the end).
+day's list into a register (new postings first, then `posted_at` bumps,
+paragraphs of 10, count at the end).
 
 No sign-in, API key, local database, or other freehire code is required. The script uses only the Python 3 standard library.
 
@@ -58,7 +59,9 @@ python day_register.py
 Default: **previous calendar day in America/New_York** (EST/EDT), same search
 filters and date cut as `export_job_urls.py` — including the location post-filter
 that drops a posting whose `location` names a country outside `countries=us`.
-`--new-only` additionally drops a `posted_at` bump. The register file starts
+The list is **new postings first**, then `posted_at` bumps — Slack and the
+register file both use that order, so the first paragraphs are the real new
+jobs. `--new-only` still drops those bumps entirely. The register file starts
 with `# date:` and `# timezone:`.
 
 ```bash
@@ -153,7 +156,8 @@ posts when there is something new. `--no-slack` writes the file only. A
 re-run that finds no new URLs skips Slack even with `--slack`.
 
 What appears in `#plan_list`: one Slack message per paragraph of 10 new URLs.
-No header. The day’s file on disk holds the full list.
+No header. Truly new postings go out first; `posted_at` bumps follow. The
+day’s file on disk holds the full list in that same order.
 
 About 178 URLs on the first run → 18 messages. To build from an
 already-exported dump without calling the API again:
@@ -252,7 +256,7 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 | `--keep-utm`        | Keep `?utm_source=freehire.me`                                                                           |
 | `--print-filters`   | Print resolved filters, date, timezone, and `new_only`, then exit                                        |
 | `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut)                                          |
-| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day — refused with `--date all` |
+| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Default keeps bumps but lists them after new postings. Needs a calendar day — refused with `--date all` |
 | `--tz NAME`         | IANA timezone for `--date` (default `America/New_York`)                                                  |
 | `--tz-offset H`     | Hours east of UTC; overrides `--tz`                                                                      |
 
@@ -261,7 +265,7 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 | Option              | Meaning                                                                       |
 | ------------------- | ----------------------------------------------------------------------------- |
 | `--date YYYY-MM-DD` | Register this day (default: `# date:` from `--from`, else yesterday)          |
-| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day  |
+| `--new-only`        | Drop a `posted_at` bump. Default keeps bumps after the new postings          |
 | `--tz NAME`         | IANA timezone (default: `# timezone:` from `--from`, else `America/New_York`) |
 | `--tz-offset H`     | Hours east of UTC; overrides `--tz` and the export header                     |
 | `--from PATH`       | Read an export file instead of calling the API                                |
