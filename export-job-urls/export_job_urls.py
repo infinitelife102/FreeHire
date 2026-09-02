@@ -6,8 +6,9 @@ This script is self-contained (stdlib only) and can be copied anywhere.
 
 Each output line is `posted_at<TAB>created_at<TAB>url` (either timestamp may be empty).
 By default only the previous calendar day in America/New_York is kept
-(`posted_at` on that day). `--new-only` also drops an earlier `created_at`
-(a source `updated_at` bump). The file starts with `# date:` / `# timezone:`.
+(`posted_at` on that day). New postings are listed first; `posted_at` bumps
+follow. `--new-only` also drops an earlier `created_at` (a source
+`updated_at` bump). The file starts with `# date:` / `# timezone:`.
 Filters match the freehire job-search API / SPA query vocabulary
 (docs/API.md § Filtering jobs, internal/search StringFacets).
 
@@ -604,6 +605,33 @@ def ensure_posted_window(filters: dict[str, str], target: date, tz: tzinfo) -> d
     return out
 
 
+def is_posted_at_bump(row: JobRow, target: date, tz: tzinfo) -> bool:
+    """True when created_at is a day before target (a source updated_at bump).
+
+    A created_at on or after target is not a bump — ingest can cross midnight.
+    A missing created_at (legacy two-column export) is not a bump.
+    """
+    created_day = calendar_day(row.created_at, tz)
+    return created_day is not None and created_day < target
+
+
+def order_new_first(rows: list[JobRow], target: date, tz: tzinfo) -> list[JobRow]:
+    """Truly new postings first, then posted_at bumps. Each group by posted_at, url."""
+    new: list[JobRow] = []
+    bumps: list[JobRow] = []
+    for row in rows:
+        if is_posted_at_bump(row, target, tz):
+            bumps.append(row)
+        else:
+            new.append(row)
+    def by_posted(r: JobRow) -> tuple[str, str]:
+        return (r.posted_at, r.url)
+
+    new.sort(key=by_posted)
+    bumps.sort(key=by_posted)
+    return new + bumps
+
+
 def filter_by_day(
     rows: list[JobRow],
     target: date,
@@ -617,7 +645,8 @@ def filter_by_day(
     `updated_at` bump (Greenhouse), not a new posting, and is dropped. A
     created_at on or after target is kept — ingest can cross midnight without
     making the job a bump. A missing created_at (legacy two-column export) is
-    not a bump; posted_at alone decides. Default is posted_at only.
+    not a bump; posted_at alone decides. Default keeps every row on that day
+    and lists new postings first, then bumps.
     """
     kept: list[JobRow] = []
     undated = 0
@@ -629,13 +658,11 @@ def filter_by_day(
             continue
         if day != target:
             continue
-        if drop_bumps:
-            created_day = calendar_day(row.created_at, tz)
-            if created_day is not None and created_day < target:
-                bumped += 1
-                continue
+        if drop_bumps and is_posted_at_bump(row, target, tz):
+            bumped += 1
+            continue
         kept.append(row)
-    kept.sort(key=lambda r: (r.posted_at, r.url))
+    kept = order_new_first(kept, target, tz)
     if bumped:
         print(
             f"dropped {bumped} jobs whose created_at is before {target.isoformat()} "
@@ -698,6 +725,7 @@ def rows_for_calendar_day(
     """Keep rows whose posted_at falls on target.
 
     drop_bumps (`--new-only`) also drops an earlier created_at bump.
+    Without it, new postings are listed first and bumps follow.
     When keep_undated is set and every row lacks a usable posted_at (a legacy
     bare-URL export), the whole list is treated as already being that day.
     """
@@ -811,7 +839,7 @@ def add_new_only_argument(p: argparse.ArgumentParser) -> None:
         help=(
             "keep only first-seen postings: drop a row whose created_at is "
             "before --date (a Greenhouse posted_at bump). Default keeps every "
-            "row whose posted_at falls on that day"
+            "row whose posted_at falls on that day and lists new postings first"
         ),
     )
 
