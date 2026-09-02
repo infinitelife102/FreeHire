@@ -13,12 +13,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 from day_register import (
+    SLACK_POST_GAP_SECONDS,
     SLACK_WEBHOOK_ENV,
+    format_register,
+    load_day_rows,
     load_dotenv,
     load_export_file,
+    new_rows,
+    plan_register,
+    post_and_record,
+    register_filename,
     resolve_slack_webhook,
-    slack_texts,
     url_blocks,
+    write_text,
 )
 from export_job_urls import (
     MAX_WINDOW,
@@ -405,15 +412,10 @@ class SlackRegisterTests(unittest.TestCase):
         self.assertEqual(blocks[0].count("\n"), 9)
         self.assertEqual(blocks[1], "https://x.test/10\nhttps://x.test/11")
 
-    def test_slack_texts_header_then_each_block(self) -> None:
+    def test_slack_posts_url_blocks_only(self) -> None:
         rows = [JobRow("https://x.test/a", ""), JobRow("https://x.test/b", "")]
-        texts = slack_texts(rows, 10, date(2026, 8, 25), "America/New_York")
-        self.assertEqual(texts[0], "register 2026-08-25 (America/New_York) — 2 jobs")
-        self.assertEqual(texts[1], "https://x.test/a\nhttps://x.test/b")
-
-    def test_slack_texts_header_only_when_empty(self) -> None:
-        texts = slack_texts([], 10, date(2026, 8, 25), "America/New_York")
-        self.assertEqual(texts, ["register 2026-08-25 (America/New_York) — 0 jobs"])
+        self.assertEqual(url_blocks(rows, 10), ["https://x.test/a\nhttps://x.test/b"])
+        self.assertEqual(url_blocks([], 10), [])
 
     def test_resolve_slack_webhook_env_and_flags(self) -> None:
         with patch.dict("os.environ", {SLACK_WEBHOOK_ENV: "https://hooks.example/x"}, clear=False):
@@ -448,6 +450,229 @@ class SlackRegisterTests(unittest.TestCase):
                     resolve_slack_webhook(None, required=True, disabled=False, env_file=path),
                     "https://hooks.example/file",
                 )
+
+
+class RegisterFileTests(unittest.TestCase):
+    def test_register_filename_is_one_file_per_day(self) -> None:
+        self.assertEqual(register_filename(date(2026, 9, 1)), "2026-09-01.txt")
+
+    def test_load_day_rows_reads_only_the_day_file(self) -> None:
+        day = date(2026, 9, 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "2026-09-01.txt").write_text(
+                "# date: 2026-09-01\nhttps://x.test/a\n", encoding="utf-8"
+            )
+            (directory / "2026-09-01(1).txt").write_text(
+                "https://x.test/b\n", encoding="utf-8"
+            )
+            (directory / "2026-08-31.txt").write_text(
+                "https://x.test/other\n", encoding="utf-8"
+            )
+            self.assertEqual(
+                [row.url for row in load_day_rows(directory, day)],
+                ["https://x.test/a"],
+            )
+            self.assertEqual(load_day_rows(directory, date(2026, 9, 2)), [])
+
+    def test_new_rows_keep_order_and_drop_seen(self) -> None:
+        rows = [
+            JobRow("https://x.test/a", ""),
+            JobRow("https://x.test/c", ""),
+            JobRow("https://x.test/b", ""),
+        ]
+        fresh = new_rows(rows, {"https://x.test/a", "https://x.test/b"})
+        self.assertEqual([r.url for r in fresh], ["https://x.test/c"])
+
+    def test_format_register_header_blocks_and_count(self) -> None:
+        text = format_register(
+            [JobRow("https://x.test/c", "")],
+            10,
+            date(2026, 9, 1),
+            "America/New_York",
+        )
+        self.assertEqual(
+            text,
+            "# date: 2026-09-01\n# timezone: America/New_York\n\n"
+            "https://x.test/c\n\n# count: 1\n",
+        )
+
+    def test_write_text_replaces_and_leaves_no_tmp(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "2026-09-01.txt"
+            write_text(path, "first\n")
+            write_text(path, "second\n")
+            self.assertEqual(path.read_text(encoding="utf-8"), "second\n")
+            leftovers = [p.name for p in Path(tmp).iterdir() if p.name != path.name]
+            self.assertEqual(leftovers, [])
+
+
+class PlanRegisterTests(unittest.TestCase):
+    day = date(2026, 9, 1)
+    tz = "America/New_York"
+
+    def _rows(self, *urls: str) -> list[JobRow]:
+        return [JobRow(url, "") for url in urls]
+
+    def _seed(self, directory: Path, *urls: str) -> str:
+        text = format_register(self._rows(*urls), 10, self.day, self.tz)
+        write_text(directory / register_filename(self.day), text)
+        return text
+
+    def test_first_plan_returns_kept_and_does_not_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            kept = self._rows("https://x.test/a", "https://x.test/b")
+            to_write, posted, status = plan_register(kept, directory, self.day)
+            self.assertEqual([r.url for r in posted or []], ["https://x.test/a", "https://x.test/b"])
+            self.assertEqual([r.url for r in to_write or []], ["https://x.test/a", "https://x.test/b"])
+            self.assertIn("2 jobs", status)
+            self.assertFalse((directory / "2026-09-01.txt").exists())
+
+    def test_first_plan_empty_returns_none_to_post(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            to_write, posted, status = plan_register([], directory, self.day)
+            self.assertEqual(to_write, [])
+            self.assertIsNone(posted)
+            self.assertIn("0 jobs", status)
+            self.assertFalse((directory / "2026-09-01.txt").exists())
+
+    def test_rerun_same_urls_skips_write_and_slack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            before = self._seed(directory, "https://x.test/a")
+            to_write, posted, status = plan_register(
+                self._rows("https://x.test/a"), directory, self.day
+            )
+            self.assertIsNone(to_write)
+            self.assertIsNone(posted)
+            self.assertIn("0 new", status)
+            self.assertEqual((directory / "2026-09-01.txt").read_text(encoding="utf-8"), before)
+
+    def test_rerun_appends_only_fresh_and_leaves_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            before = self._seed(directory, "https://x.test/a")
+            to_write, posted, status = plan_register(
+                self._rows("https://x.test/a", "https://x.test/c", "https://x.test/b"),
+                directory,
+                self.day,
+            )
+            self.assertEqual([r.url for r in posted or []], ["https://x.test/c", "https://x.test/b"])
+            self.assertEqual(
+                [r.url for r in to_write or []],
+                ["https://x.test/a", "https://x.test/c", "https://x.test/b"],
+            )
+            self.assertIn("2 new", status)
+            self.assertEqual((directory / "2026-09-01.txt").read_text(encoding="utf-8"), before)
+
+    def test_rerun_keeps_urls_missing_from_kept(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self._seed(directory, "https://x.test/a")
+            to_write, posted, status = plan_register(
+                self._rows("https://x.test/b"), directory, self.day
+            )
+            self.assertEqual([r.url for r in posted or []], ["https://x.test/b"])
+            self.assertEqual(
+                [r.url for r in to_write or []],
+                ["https://x.test/a", "https://x.test/b"],
+            )
+            self.assertIn("1 new", status)
+
+
+class PostAndRecordTests(unittest.TestCase):
+    day = date(2026, 9, 1)
+    tz = "America/New_York"
+
+    def _rows(self, *urls: str) -> list[JobRow]:
+        return [JobRow(url, "") for url in urls]
+
+    def test_persists_after_each_successful_block(self) -> None:
+        posts: list[str] = []
+        sleeps: list[float] = []
+
+        def post(_webhook: str, text: str) -> None:
+            posts.append(text)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            n = post_and_record(
+                [],
+                self._rows(*[f"https://x.test/{i}" for i in range(12)]),
+                directory,
+                self.day,
+                self.tz,
+                10,
+                "https://hooks.example/x",
+                post=post,
+                sleep=sleeps.append,
+            )
+            self.assertEqual(n, 2)
+            self.assertEqual(len(posts), 2)
+            self.assertEqual(posts[0].count("\n"), 9)
+            self.assertEqual(posts[1], "https://x.test/10\nhttps://x.test/11")
+            self.assertEqual(sleeps, [SLACK_POST_GAP_SECONDS])
+            self.assertEqual(
+                [r.url for r in load_day_rows(directory, self.day)],
+                [f"https://x.test/{i}" for i in range(12)],
+            )
+
+    def test_failed_block_leaves_only_successful_ones(self) -> None:
+        def post(_webhook: str, text: str) -> None:
+            if "https://x.test/10" in text:
+                raise SystemExit("Slack HTTP 500: boom")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            prior = self._rows("https://x.test/old")
+            write_text(
+                directory / register_filename(self.day),
+                format_register(prior, 10, self.day, self.tz),
+            )
+            with self.assertRaises(SystemExit):
+                post_and_record(
+                    prior,
+                    self._rows(*[f"https://x.test/{i}" for i in range(12)]),
+                    directory,
+                    self.day,
+                    self.tz,
+                    10,
+                    "https://hooks.example/x",
+                    post=post,
+                    sleep=lambda _: None,
+                )
+            self.assertEqual(
+                [r.url for r in load_day_rows(directory, self.day)],
+                ["https://x.test/old"] + [f"https://x.test/{i}" for i in range(10)],
+            )
+
+    def test_failed_first_block_leaves_prior_untouched(self) -> None:
+        def post(_webhook: str, _text: str) -> None:
+            raise SystemExit("Slack request failed")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            prior = self._rows("https://x.test/old")
+            before = format_register(prior, 10, self.day, self.tz)
+            write_text(directory / register_filename(self.day), before)
+            with self.assertRaises(SystemExit):
+                post_and_record(
+                    prior,
+                    self._rows("https://x.test/new"),
+                    directory,
+                    self.day,
+                    self.tz,
+                    10,
+                    "https://hooks.example/x",
+                    post=post,
+                    sleep=lambda _: None,
+                )
+            self.assertEqual(
+                (directory / register_filename(self.day)).read_text(encoding="utf-8"),
+                before,
+            )
 
 
 if __name__ == "__main__":

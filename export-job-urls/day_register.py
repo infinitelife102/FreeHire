@@ -4,8 +4,12 @@
 Pulls the previous calendar day's jobs (same search filters as export_job_urls.py),
 writes them in paragraphs of 10, and records the count at the end.
 
-Also creates an empty leftover file for that date so unfinished URLs can be
-moved out of the register without inventing a path later.
+A later run for the same date keeps one file, YYYY-MM-DD.txt. It diffs
+against URLs already in that day's register and appends only the new
+ones. URLs already recorded stay even if a later fetch drops them. Slack
+gets those new URLs, not the whole day again. Each Slack block is written
+after it succeeds, so a failed block can be retried without re-posting
+the ones that already landed.
 
 Usage:
   python day_register.py
@@ -24,9 +28,11 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -52,13 +58,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # This script's own tree — not exports/ (that folder belongs to export_job_urls.py).
 DAY_DIR = SCRIPT_DIR / "day-register"
 REGISTER_DIR = DAY_DIR / "register"
-LEFTOVER_DIR = DAY_DIR / "leftover"
 
 BLOCK_SIZE = 10
 SLACK_WEBHOOK_ENV = "DAY_REGISTER_SLACK_WEBHOOK"
 ENV_FILE = SCRIPT_DIR / ".env"
-# Incoming webhooks allow one post per second; stay under that between blocks.
-SLACK_POST_GAP_SECONDS = 0.4
+# Incoming webhooks allow one post per second; wait at least that between blocks.
+SLACK_POST_GAP_SECONDS = 1.0
 
 
 def load_dotenv(path: Path) -> dict[str, str]:
@@ -99,7 +104,11 @@ def load_export_file(path: Path) -> tuple[list[JobRow], date | None, str | None]
 
 
 def url_blocks(rows: list[JobRow], block_size: int) -> list[str]:
-    """The same 10-URL paragraphs the register file and Slack both use."""
+    """Split rows into paragraphs of block_size URLs.
+
+    The register file chunks the full day. Slack chunks only the rows being
+    posted — the whole day on the first run, new URLs after that.
+    """
     chunks: list[str] = []
     for i in range(0, len(rows), block_size):
         block = rows[i : i + block_size]
@@ -107,7 +116,58 @@ def url_blocks(rows: list[JobRow], block_size: int) -> list[str]:
     return chunks
 
 
-def format_register(rows: list[JobRow], block_size: int, day: date, tz_label: str) -> str:
+def register_filename(day: date) -> str:
+    return f"{day.isoformat()}.txt"
+
+
+def load_day_rows(directory: Path, day: date) -> list[JobRow]:
+    """URLs already recorded in this day's YYYY-MM-DD.txt, if it exists."""
+    path = directory / register_filename(day)
+    if not path.is_file():
+        return []
+    rows, _, _ = load_export_file(path)
+    return rows
+
+
+def new_rows(rows: list[JobRow], seen: set[str]) -> list[JobRow]:
+    return [row for row in rows if row.url not in seen]
+
+
+def plan_register(
+    kept: list[JobRow],
+    directory: Path,
+    day: date,
+) -> tuple[list[JobRow] | None, list[JobRow] | None, str]:
+    """Decide what to write and what Slack should post. Does not write.
+
+    Returns (rows to write or None to leave the file, rows Slack should post
+    or None if nothing new, status line). An empty first write still creates
+    the file, but does not post. The file is append-only: a URL already
+    recorded is kept even when it is missing from kept.
+    """
+    register_path = directory / register_filename(day)
+    prior = load_day_rows(directory, day)
+    seen = {row.url for row in prior}
+    fresh = new_rows(kept, seen)
+
+    if not register_path.is_file():
+        status = f"register {day.isoformat()}: {len(kept)} jobs → {register_path}"
+        return kept, (kept or None), status
+
+    if not fresh:
+        return None, None, f"register {day.isoformat()}: 0 new (already had {len(seen)})"
+
+    combined = prior + fresh
+    status = (
+        f"register {day.isoformat()}: {len(fresh)} new "
+        f"(now {len(combined)}) → {register_path}"
+    )
+    return combined, fresh, status
+
+
+def format_register(
+    rows: list[JobRow], block_size: int, day: date, tz_label: str
+) -> str:
     chunks = url_blocks(rows, block_size)
     body = "\n\n".join(chunks)
     header = f"# date: {day.isoformat()}\n# timezone: {tz_label}\n\n"
@@ -116,34 +176,25 @@ def format_register(rows: list[JobRow], block_size: int, day: date, tz_label: st
     return header + body + f"# count: {len(rows)}\n"
 
 
-def slack_texts(rows: list[JobRow], block_size: int, day: date, tz_label: str) -> list[str]:
-    """One header, then one Slack message per register paragraph."""
-    header = f"register {day.isoformat()} ({tz_label}) — {len(rows)} jobs"
-    return [header, *url_blocks(rows, block_size)]
-
-
-def post_slack(webhook: str, texts: list[str]) -> None:
+def post_slack(webhook: str, text: str) -> None:
     if not webhook.startswith(("https://", "http://")):
         raise SystemExit("Slack webhook must be an http(s) URL")
-    for i, text in enumerate(texts):
-        payload = json.dumps({"text": text}).encode("utf-8")
-        req = urllib.request.Request(
-            webhook,
-            data=payload,
-            headers={"Content-Type": "application/json", "User-Agent": "freehire-day-register/1.0"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                resp.read()
-        except urllib.error.HTTPError as e:
-            raise SystemExit(
-                f"Slack HTTP {e.code}: {e.read().decode('utf-8', errors='replace')}"
-            ) from e
-        except urllib.error.URLError as e:
-            raise SystemExit(f"Slack request failed: {e}") from e
-        if i + 1 < len(texts):
-            time.sleep(SLACK_POST_GAP_SECONDS)
+    payload = json.dumps({"text": text}).encode("utf-8")
+    req = urllib.request.Request(
+        webhook,
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "freehire-day-register/1.0"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+    except urllib.error.HTTPError as e:
+        raise SystemExit(
+            f"Slack HTTP {e.code}: {e.read().decode('utf-8', errors='replace')}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise SystemExit(f"Slack request failed: {e}") from e
 
 
 def resolve_slack_webhook(
@@ -171,33 +222,51 @@ def resolve_slack_webhook(
     return None
 
 
-def leftover_header(day: date, tz_label: str) -> str:
-    return (
-        f"# leftover {day.isoformat()} ({tz_label}) — paste URLs from the "
-        "register that you did not finish\n"
-    )
-
-
 def write_text(path: Path, text: str) -> None:
+    """Write text via a same-directory temp file, then replace."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(text)
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
-def write_register(path: Path, text: str) -> None:
-    write_text(path, text)
+def post_and_record(
+    prior: list[JobRow],
+    fresh: list[JobRow],
+    directory: Path,
+    day: date,
+    tz_label: str,
+    block_size: int,
+    webhook: str,
+    *,
+    post: Callable[[str, str], None] | None = None,
+    sleep: Callable[[float], None] | None = None,
+) -> int:
+    """Post fresh in blocks and persist after each success.
 
-
-def ensure_leftover(path: Path, day: date, tz_label: str) -> str:
-    """Create the leftover file if it is missing. Never overwrite content."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        existing = path.read_text(encoding="utf-8")
-        if any(line.strip() and not line.lstrip().startswith("#") for line in existing.splitlines()):
-            return "kept (already has urls)"
-        return "kept (already exists)"
-    write_text(path, leftover_header(day, tz_label))
-    return "created"
+    Returns the number of Slack messages sent. A failed post leaves the
+    register at the last successful block so a retry sends only the rest.
+    """
+    post_fn = post or post_slack
+    sleep_fn = sleep or time.sleep
+    acc = list(prior)
+    path = directory / register_filename(day)
+    chunks = [fresh[i : i + block_size] for i in range(0, len(fresh), block_size)]
+    for i, block in enumerate(chunks):
+        post_fn(webhook, "\n".join(row.url for row in block))
+        acc.extend(block)
+        write_text(path, format_register(acc, block_size, day, tz_label))
+        if i + 1 < len(chunks):
+            sleep_fn(SLACK_POST_GAP_SECONDS)
+    return len(chunks)
 
 
 def main() -> None:
@@ -251,7 +320,7 @@ def main() -> None:
     p.add_argument(
         "--slack",
         action="store_true",
-        help="post the register to Slack (requires webhook; fails if missing)",
+        help="post new URLs to Slack (requires webhook; fails if missing)",
     )
     p.add_argument(
         "--no-slack",
@@ -318,24 +387,36 @@ def main() -> None:
     elif undated:
         print(f"skipped {undated} rows with no usable posted_at", file=sys.stderr)
 
-    register_path = REGISTER_DIR / f"{target.isoformat()}.txt"
-    leftover_path = LEFTOVER_DIR / f"{target.isoformat()}.txt"
-    write_register(register_path, format_register(kept, args.block_size, target, tz_label))
-    leftover_state = ensure_leftover(leftover_path, target, tz_label)
+    register_path = REGISTER_DIR / register_filename(target)
+    to_write, posted_rows, status = plan_register(kept, REGISTER_DIR, target)
 
-    print(
-        f"register {target.isoformat()}: {len(kept)} jobs → {register_path}",
-        file=sys.stderr,
-    )
-    print(f"leftover: {leftover_state} → {leftover_path}", file=sys.stderr)
+    webhook: str | None = None
+    if posted_rows is None:
+        if args.slack:
+            print("slack: skipped (no new urls)", file=sys.stderr)
+    else:
+        webhook = resolve_slack_webhook(
+            args.slack_webhook, required=args.slack, disabled=args.no_slack
+        )
 
-    webhook = resolve_slack_webhook(
-        args.slack_webhook, required=args.slack, disabled=args.no_slack
-    )
-    if webhook:
-        messages = slack_texts(kept, args.block_size, target, tz_label)
-        post_slack(webhook, messages)
-        print(f"slack: posted {len(messages)} messages", file=sys.stderr)
+    if webhook and posted_rows:
+        prior = load_day_rows(REGISTER_DIR, target)
+        n = post_and_record(
+            prior,
+            posted_rows,
+            REGISTER_DIR,
+            target,
+            tz_label,
+            args.block_size,
+            webhook,
+        )
+        print(f"slack: posted {n} messages", file=sys.stderr)
+    elif to_write is not None:
+        write_text(
+            register_path,
+            format_register(to_write, args.block_size, target, tz_label),
+        )
+    print(status, file=sys.stderr)
 
 
 if __name__ == "__main__":
