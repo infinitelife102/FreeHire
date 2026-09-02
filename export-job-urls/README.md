@@ -4,8 +4,8 @@ Fetch apply URLs for jobs that match a freehire search filter and write them to 
 
 Each export line is `posted_at<TAB>created_at<TAB>url`. By default only
 **yesterday in America/New_York** is kept — `posted_at` must fall on that day.
-An earlier `created_at` is a source `updated_at` bump (Greenhouse) and is
-dropped; a later `created_at` (ingest after midnight) is kept.
+`--new-only` also drops an earlier `created_at` (a source `updated_at` bump);
+a later `created_at` (ingest after midnight) is kept.
 The file starts with `# date:` / `# timezone:`. `day_register.py` turns that
 day's list into a register (paragraphs of 10, count at the end) plus an empty
 leftover file.
@@ -42,9 +42,9 @@ With no filters on the command line, the built-in defaults are used:
 
 - `work_mode=remote`
 - `countries=us`
-- `category=software_engineering,backend,frontend,fullstack,mobile,devops,data_engineering,ai_engineering`
+- `category=software_engineering,backend,frontend,fullstack,mobile`
 - `semantic_ratio=0`
-- **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip). A job whose `posted_at` is that day but `created_at` is earlier is a date bump and is dropped
+- **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip). `--new-only` also drops a `posted_at` bump whose `created_at` is an earlier day; it needs a calendar day (`--date all --new-only` is refused)
 - `posted_within_days=3` is only the API fetch window, then the date cut is applied
 - After the API match, a job whose `location` names a country **outside** `countries` is dropped (role-cluster geography can tag a Spain listing `us`). Bare `Remote` / a US city / empty location is kept
 
@@ -58,9 +58,9 @@ python day_register.py
 
 Default: **previous calendar day in America/New_York** (EST/EDT), same search
 filters and date cut as `export_job_urls.py` — including the location post-filter
-that drops a posting whose `location` names a country outside `countries=us`,
-and dropping a `posted_at` bump whose `created_at` is an earlier day. The
-register file starts with `# date:` and `# timezone:`.
+that drops a posting whose `location` names a country outside `countries=us`.
+`--new-only` additionally drops a `posted_at` bump. The register file starts
+with `# date:` and `# timezone:`.
 
 ```bash
 python day_register.py --date 2026-08-15
@@ -234,22 +234,24 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 
 ## Other options
 
-| Option              | Meaning                                                         |
-| ------------------- | --------------------------------------------------------------- |
-| `-o PATH`           | Output path (relative paths are under `exports/`)               |
-| `--base-url URL`    | API origin (default `https://freehire.me`)                      |
-| `--page-size N`     | Page size 1–100 (default 100)                                   |
-| `--keep-utm`        | Keep `?utm_source=freehire.me`                                  |
-| `--print-filters`   | Print resolved filters and exit                                 |
-| `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut) |
-| `--tz NAME`         | IANA timezone for `--date` (default `America/New_York`)         |
-| `--tz-offset H`     | Hours east of UTC; overrides `--tz`                             |
+| Option              | Meaning                                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `-o PATH`           | Output path (relative paths are under `exports/`)                                               |
+| `--base-url URL`    | API origin (default `https://freehire.me`)                                                      |
+| `--page-size N`     | Page size 1–100 (default 100)                                                                   |
+| `--keep-utm`        | Keep `?utm_source=freehire.me`                                                                  |
+| `--print-filters`   | Print resolved filters, date, timezone, and `new_only`, then exit                               |
+| `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut)                                 |
+| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day — refused with `--date all` |
+| `--tz NAME`         | IANA timezone for `--date` (default `America/New_York`)                                         |
+| `--tz-offset H`     | Hours east of UTC; overrides `--tz`                                                             |
 
 `day_register.py` extras:
 
 | Option              | Meaning                                                                       |
 | ------------------- | ----------------------------------------------------------------------------- |
 | `--date YYYY-MM-DD` | Register this day (default: `# date:` from `--from`, else yesterday)          |
+| `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Needs a calendar day   |
 | `--tz NAME`         | IANA timezone (default: `# timezone:` from `--from`, else `America/New_York`) |
 | `--tz-offset H`     | Hours east of UTC; overrides `--tz` and the export header                     |
 | `--from PATH`       | Read an export file instead of calling the API                                |

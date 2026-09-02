@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import io
 import os
 import tempfile
@@ -23,6 +24,7 @@ from export_job_urls import (
     MAX_WINDOW,
     JobRow,
     _USEastern,
+    add_new_only_argument,
     calendar_day,
     collect_jobs,
     countries_named_in,
@@ -32,6 +34,7 @@ from export_job_urls import (
     parse_export_header,
     parse_job_line,
     requested_country_codes,
+    require_date_for_new_only,
     resolve_tz,
     rows_for_calendar_day,
     utc_offset_from_label,
@@ -170,7 +173,7 @@ class RowsForCalendarDayTests(unittest.TestCase):
         self.assertEqual([r.url for r in kept], ["https://x.test/a", "https://x.test/b"])
         self.assertEqual(undated, 2)
 
-    def test_drops_posted_at_bump_when_created_at_is_older(self) -> None:
+    def test_keeps_posted_at_bump_by_default(self) -> None:
         rows = [
             JobRow(
                 "https://job-boards.greenhouse.io/specterops/jobs/8621096002",
@@ -186,6 +189,34 @@ class RowsForCalendarDayTests(unittest.TestCase):
         buf = io.StringIO()
         with patch("sys.stderr", buf):
             kept, undated = rows_for_calendar_day(rows, date(2026, 8, 31), self.tz)
+        self.assertEqual(
+            [r.url for r in kept],
+            [
+                "https://x.test/new",
+                "https://job-boards.greenhouse.io/specterops/jobs/8621096002",
+            ],
+        )
+        self.assertEqual(undated, 0)
+        self.assertEqual(buf.getvalue(), "")
+
+    def test_drops_posted_at_bump_when_new_only(self) -> None:
+        rows = [
+            JobRow(
+                "https://job-boards.greenhouse.io/specterops/jobs/8621096002",
+                "2026-08-31T14:08:48Z",
+                "2026-07-06T16:49:29Z",
+            ),
+            JobRow(
+                "https://x.test/new",
+                "2026-08-31T12:00:00Z",
+                "2026-08-31T11:00:00Z",
+            ),
+        ]
+        buf = io.StringIO()
+        with patch("sys.stderr", buf):
+            kept, undated = rows_for_calendar_day(
+                rows, date(2026, 8, 31), self.tz, drop_bumps=True
+            )
         self.assertEqual([r.url for r in kept], ["https://x.test/new"])
         self.assertEqual(undated, 0)
         self.assertIn("dropped 1 jobs whose created_at is before 2026-08-31", buf.getvalue())
@@ -201,7 +232,9 @@ class RowsForCalendarDayTests(unittest.TestCase):
         ]
         buf = io.StringIO()
         with patch("sys.stderr", buf):
-            kept, undated = rows_for_calendar_day(rows, date(2026, 8, 31), self.tz)
+            kept, undated = rows_for_calendar_day(
+                rows, date(2026, 8, 31), self.tz, drop_bumps=True
+            )
         self.assertEqual([r.url for r in kept], ["https://x.test/late"])
         self.assertEqual(undated, 0)
         self.assertEqual(buf.getvalue(), "")
@@ -242,10 +275,25 @@ class RowsForCalendarDayTests(unittest.TestCase):
             row,
             JobRow(url="https://x.test/a", posted_at="2026-08-31T12:00:00Z", created_at=""),
         )
-        kept, undated = rows_for_calendar_day([row], date(2026, 8, 31), self.tz)
+        kept, undated = rows_for_calendar_day(
+            [row], date(2026, 8, 31), self.tz, drop_bumps=True
+        )
         self.assertEqual([r.url for r in kept], ["https://x.test/a"])
         self.assertEqual(undated, 0)
         self.assertEqual(format_job_line(row), raw)
+
+    def test_new_only_flag_defaults_off(self) -> None:
+        p = argparse.ArgumentParser()
+        add_new_only_argument(p)
+        self.assertFalse(p.parse_args([]).new_only)
+        self.assertTrue(p.parse_args(["--new-only"]).new_only)
+
+    def test_new_only_refuses_date_all(self) -> None:
+        require_date_for_new_only(False, None)
+        require_date_for_new_only(True, date(2026, 8, 31))
+        with self.assertRaises(SystemExit) as ctx:
+            require_date_for_new_only(True, None)
+        self.assertIn("--date all", str(ctx.exception))
 
 
 class WarnIfWindowTruncatedTests(unittest.TestCase):
