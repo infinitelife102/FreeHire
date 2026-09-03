@@ -38,7 +38,9 @@ from export_job_urls import (
     calendar_day,
     collect_jobs,
     countries_named_in,
+    days_needed_for,
     effective_tz,
+    ensure_posted_window,
     filters_from_args,
     format_job_line,
     location_names_other_country,
@@ -58,8 +60,7 @@ from export_job_urls import (
 SPA_SEARCH_URL = (
     "https://freehire.me/?work_mode=remote"
     "&category=software_engineering,backend,frontend,fullstack,mobile"
-    "&countries=us&relocation=not_supported&requires_clearance=false"
-    "&posted_within_days=3"
+    "&countries=us&requires_clearance=false"
 )
 
 
@@ -106,6 +107,13 @@ class FilterVocabTests(unittest.TestCase):
         self.assertNotIn("semantic_ratio", got)
         self.assertNotIn("limit", got)
         self.assertEqual(got, DEFAULT_FILTERS)
+
+    def test_defaults_leave_the_posted_window_to_ensure_posted_window(self) -> None:
+        self.assertNotIn("posted_within_days", DEFAULT_FILTERS)
+        tz = timezone.utc
+        target = datetime.now(tz).date() - timedelta(days=1)
+        out = ensure_posted_window(dict(DEFAULT_FILTERS), target, tz)
+        self.assertEqual(out["posted_within_days"], str(days_needed_for(target, tz)))
 
 
 class LocationCountryFilterTests(unittest.TestCase):

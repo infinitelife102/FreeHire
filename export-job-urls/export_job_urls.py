@@ -15,7 +15,7 @@ Filters match the freehire job-search API / SPA query vocabulary
 Usage:
   python export_job_urls.py
   python export_job_urls.py --work-mode remote --countries us --category backend,frontend
-  python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&countries=us&relocation=not_supported&requires_clearance=false&posted_within_days=3"
+  python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&countries=us&requires_clearance=false"
   python export_job_urls.py --query "skills=go,rust&skills_mode=and&work_mode=remote"
 """
 
@@ -92,15 +92,17 @@ SEARCH_EXTRAS = (
 DROPPED_IMPORT_KEYS = frozenset({"limit", "offset", "semantic_ratio"})
 
 # Used only when the caller passes no filters at all.
-# posted_within_days is the API window (wide enough for yesterday morning).
-# The calendar cut is --date (default: yesterday in America/New_York), not this number.
+# Search facets only. posted_within_days is not a default — ensure_posted_window
+# sizes the API fetch from --date (yesterday morning still covers 00:00), then
+# the calendar cut keeps that day.
 # Category is the product-engineering IC set the daily bid is built from
 # (software_engineering plus backend/frontend/fullstack/mobile). devops /
 # data_engineering / ai_engineering stay commented out — different bid —
 # as do SRE/QA/security/architecture and the science/analytics/training ML
 # buckets. Hybrid/onsite stay out — those are not bid-from-anywhere roles.
-# Relocation / clearance match the SPA search the daily list is built from
-# (relocation=not_supported, requires_clearance=false).
+# Clearance matches the SPA search the daily list is built from
+# (requires_clearance=false). Relocation is left unset so the API
+# does not filter on it.
 DEFAULT_FILTERS: dict[str, str] = {
     "work_mode": "remote",
     "category": (
@@ -108,9 +110,7 @@ DEFAULT_FILTERS: dict[str, str] = {
         # ",devops,data_engineering,ai_engineering"
     ),
     "countries": "us",
-    "relocation": "not_supported",
     "requires_clearance": "false",
-    "posted_within_days": "3",
 }
 
 DEFAULT_TZ_NAME = "America/New_York"
