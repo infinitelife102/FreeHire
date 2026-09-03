@@ -83,10 +83,10 @@ git push --force-with-lease origin feat/export-job-urls
 
 ## Quick reference
 
-| Goal | Commands |
-| --- | --- |
-| Fetch canonical latest | `git fetch upstream` |
-| Update local `main` | `git checkout main` → `git merge upstream/main` |
-| Update fork's `main` | `git push origin main` |
-| Refresh feature branch | `git checkout feat/export-job-urls` → `git rebase main` |
+| Goal                   | Commands                                                  |
+| ---------------------- | --------------------------------------------------------- |
+| Fetch canonical latest | `git fetch upstream`                                      |
+| Update local `main`    | `git checkout main` → `git merge upstream/main`           |
+| Update fork's `main`   | `git push origin main`                                    |
+| Refresh feature branch | `git checkout feat/export-job-urls` → `git rebase main`   |
 | Publish rebased branch | `git push --force-with-lease origin feat/export-job-urls` |
