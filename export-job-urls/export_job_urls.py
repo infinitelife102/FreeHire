@@ -15,7 +15,7 @@ Filters match the freehire job-search API / SPA query vocabulary
 Usage:
   python export_job_urls.py
   python export_job_urls.py --work-mode remote --countries us --category backend,frontend
-  python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&countries=us&posted_within_days=3"
+  python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&countries=us&relocation=not_supported&requires_clearance=false&posted_within_days=3"
   python export_job_urls.py --query "skills=go,rust&skills_mode=and&work_mode=remote"
 """
 
@@ -60,8 +60,12 @@ STRING_FACETS = (
     "salary_period",
     "skills",
     "is_tech",
+    # true-or-absent boolean; the API treats "false" as "not marked" (see
+    # search.RequiresClearanceParam), so the value must be forwarded as-is.
+    "requires_clearance",
     "role",
     "ai_archetype",
+    "role_type",
     "reality",
     "collections",
     "relocation",
@@ -74,25 +78,29 @@ SEARCH_EXTRAS = (
     "q",
     "sort",
     "order",
-    "semantic_ratio",
     "visa_sponsorship",
     "salary_min",
     "salary_max",
     "experience_years_min",
+    "experience_years_max",
     "posted_within_days",
+    "open_within_days",
 )
 
-# Dropped when importing a SPA/API URL — pagination is owned by this script.
-PAGINATION_KEYS = frozenset({"limit", "offset"})
+# Dropped when importing a SPA/API URL. Pagination is owned by this script.
+# semantic_ratio was removed from GET /jobs/search with hybrid search.
+DROPPED_IMPORT_KEYS = frozenset({"limit", "offset", "semantic_ratio"})
 
 # Used only when the caller passes no filters at all.
 # posted_within_days is the API window (wide enough for yesterday morning).
 # The calendar cut is --date (default: yesterday in America/New_York), not this number.
-# Category is product-engineering plus the adjacent IC work that still
-# looks like building software: devops (platform/cloud), data pipelines,
-# and applying models in product (RAG/agents). SRE/QA/security/architecture
-# and the science/analytics/training ML buckets stay out — different bid.
-# Hybrid/onsite stay out — those are not bid-from-anywhere roles.
+# Category is the product-engineering IC set the daily bid is built from
+# (software_engineering plus backend/frontend/fullstack/mobile). devops /
+# data_engineering / ai_engineering stay commented out — different bid —
+# as do SRE/QA/security/architecture and the science/analytics/training ML
+# buckets. Hybrid/onsite stay out — those are not bid-from-anywhere roles.
+# Relocation / clearance match the SPA search the daily list is built from
+# (relocation=not_supported, requires_clearance=false).
 DEFAULT_FILTERS: dict[str, str] = {
     "work_mode": "remote",
     "category": (
@@ -100,8 +108,9 @@ DEFAULT_FILTERS: dict[str, str] = {
         # ",devops,data_engineering,ai_engineering"
     ),
     "countries": "us",
+    "relocation": "not_supported",
+    "requires_clearance": "false",
     "posted_within_days": "3",
-    "semantic_ratio": "0",
 }
 
 DEFAULT_TZ_NAME = "America/New_York"
@@ -782,7 +791,7 @@ def parse_query_string(raw: str) -> dict[str, str]:
 
     multi: dict[str, list[str]] = {}
     for key, value in urllib.parse.parse_qsl(query, keep_blank_values=False):
-        if key in PAGINATION_KEYS:
+        if key in DROPPED_IMPORT_KEYS:
             continue
         multi.setdefault(key, []).append(value)
 
@@ -884,12 +893,13 @@ def add_filter_arguments(p: argparse.ArgumentParser) -> None:
     g.add_argument("--q", dest="q", default=None, help="full-text query")
     g.add_argument("--sort", choices=("created_at", "posted_at", "salary_min", "salary_max"), default=None)
     g.add_argument("--order", choices=("asc", "desc"), default=None)
-    g.add_argument("--semantic-ratio", dest="semantic_ratio", default=None, metavar="N")
     g.add_argument("--visa-sponsorship", dest="visa_sponsorship", choices=("true", "false"), default=None)
     g.add_argument("--salary-min", dest="salary_min", default=None, metavar="N")
     g.add_argument("--salary-max", dest="salary_max", default=None, metavar="N")
     g.add_argument("--experience-years-min", dest="experience_years_min", default=None, metavar="N")
+    g.add_argument("--experience-years-max", dest="experience_years_max", default=None, metavar="N")
     g.add_argument("--posted-within-days", dest="posted_within_days", default=None, metavar="N")
+    g.add_argument("--open-within-days", dest="open_within_days", default=None, metavar="N")
 
 
 def fetch_page(base: str, filters: dict[str, str], limit: int, offset: int) -> dict[str, Any]:

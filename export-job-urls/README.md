@@ -43,7 +43,8 @@ With no filters on the command line, the built-in defaults are used:
 - `work_mode=remote`
 - `countries=us`
 - `category=software_engineering,backend,frontend,fullstack,mobile`
-- `semantic_ratio=0`
+- `relocation=not_supported`
+- `requires_clearance=false`
 - **calendar date = yesterday in America/New_York** (`--date`; pass `--date all` to skip). `--new-only` also drops a `posted_at` bump whose `created_at` is an earlier day; it needs a calendar day (`--date all --new-only` is refused)
 - `posted_within_days=3` is only the API fetch window, then the date cut is applied
 - After the API match, a job whose `location` names a country **outside** `countries` is dropped (role-cluster geography can tag a Spain listing `us`). Bare `Remote` / a US city / empty location is kept
@@ -177,7 +178,7 @@ day's list.
 Pass a freehire search URL from the browser, or an API search URL:
 
 ```bash
-python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&category=software_engineering,backend,frontend,fullstack,mobile,devops,data_engineering,ai_engineering&countries=us&posted_within_days=3"
+python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&category=software_engineering,backend,frontend,fullstack,mobile&countries=us&relocation=not_supported&requires_clearance=false&posted_within_days=3"
 ```
 
 ```bash
@@ -203,6 +204,8 @@ python export_job_urls.py \
   --work-mode remote \
   --category backend,frontend,fullstack \
   --countries us \
+  --relocation not_supported \
+  --requires-clearance false \
   --posted-within-days 3 \
   --skills go,rust \
   --skills-mode and \
@@ -214,15 +217,17 @@ String facets (same set as `StringFacets`):
 
 `source`, `company_slug`, `regions`, `work_mode`, `employment_type`, `education_level`,
 `seniority`, `category`, `domains`, `countries`, `cities`, `company_type`, `company_size`,
-`salary_currency`, `salary_period`, `skills`, `is_tech`, `role`, `ai_archetype`, `reality`,
-`collections`, `relocation`, `english_level`, `posting_language`
+`salary_currency`, `salary_period`, `skills`, `is_tech`, `requires_clearance`, `role`,
+`ai_archetype`, `role_type`, `reality`, `collections`, `relocation`, `english_level`,
+`posting_language`
 
 Each facet also supports `--<facet>-mode and|or` and `--<facet>-exclude VAL`.
 
 Other search params:
 
-`--q`, `--sort`, `--order`, `--semantic-ratio`, `--visa-sponsorship`,
-`--salary-min`, `--salary-max`, `--experience-years-min`, `--posted-within-days`
+`--q`, `--sort`, `--order`, `--visa-sponsorship`,
+`--salary-min`, `--salary-max`, `--experience-years-min`, `--experience-years-max`,
+`--posted-within-days`, `--open-within-days`
 
 Precedence: **CLI flags >** `--query` **>** `--from-url`.
 If **no** filter flags / `--query` / `--from-url` are set, `DEFAULT_FILTERS` at the top of the script is used.
