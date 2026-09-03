@@ -28,19 +28,24 @@ from day_register import (
     write_text,
 )
 from export_job_urls import (
+    DEFAULT_FILTERS,
     MAX_WINDOW,
+    STRING_FACETS,
     JobRow,
     _USEastern,
+    add_filter_arguments,
     add_new_only_argument,
     calendar_day,
     collect_jobs,
     countries_named_in,
     effective_tz,
+    filters_from_args,
     format_job_line,
     location_names_other_country,
     order_new_first,
     parse_export_header,
     parse_job_line,
+    parse_query_string,
     requested_country_codes,
     require_date_for_new_only,
     resolve_tz,
@@ -48,6 +53,59 @@ from export_job_urls import (
     utc_offset_from_label,
     warn_if_window_truncated,
 )
+
+
+SPA_SEARCH_URL = (
+    "https://freehire.me/?work_mode=remote"
+    "&category=software_engineering,backend,frontend,fullstack,mobile"
+    "&countries=us&relocation=not_supported&requires_clearance=false"
+    "&posted_within_days=3"
+)
+
+
+class FilterVocabTests(unittest.TestCase):
+    def test_defaults_match_current_spa_search(self) -> None:
+        self.assertEqual(DEFAULT_FILTERS, parse_query_string(SPA_SEARCH_URL))
+
+    def test_from_url_args_use_the_spa_defaults(self) -> None:
+        p = argparse.ArgumentParser()
+        add_filter_arguments(p)
+        args = p.parse_args(["--from-url", SPA_SEARCH_URL])
+        self.assertEqual(filters_from_args(args), DEFAULT_FILTERS)
+
+    def test_cli_flags_for_new_params(self) -> None:
+        p = argparse.ArgumentParser()
+        add_filter_arguments(p)
+        args = p.parse_args(
+            [
+                "--relocation",
+                "not_supported",
+                "--requires-clearance",
+                "false",
+                "--role-type",
+                "people_manager",
+                "--experience-years-max",
+                "5",
+                "--open-within-days",
+                "7",
+            ]
+        )
+        filters = filters_from_args(args)
+        self.assertEqual(filters["relocation"], "not_supported")
+        self.assertEqual(filters["requires_clearance"], "false")
+        self.assertEqual(filters["role_type"], "people_manager")
+        self.assertEqual(filters["experience_years_max"], "5")
+        self.assertEqual(filters["open_within_days"], "7")
+
+    def test_string_facets_cover_new_api_keys(self) -> None:
+        self.assertIn("requires_clearance", STRING_FACETS)
+        self.assertIn("role_type", STRING_FACETS)
+
+    def test_imported_url_drops_retired_semantic_ratio(self) -> None:
+        got = parse_query_string(SPA_SEARCH_URL + "&semantic_ratio=0&limit=20")
+        self.assertNotIn("semantic_ratio", got)
+        self.assertNotIn("limit", got)
+        self.assertEqual(got, DEFAULT_FILTERS)
 
 
 class LocationCountryFilterTests(unittest.TestCase):
