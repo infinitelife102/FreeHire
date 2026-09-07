@@ -79,13 +79,22 @@ already recorded for that day and appends only the new ones (`# count` is
 updated). A URL already in the file stays there even if a later fetch
 drops it. When Slack is on, each 10-URL block is posted and then written;
 a failed block leaves the earlier ones recorded, and a retry sends only
-what is still missing.
+what is still missing. `--with-jd` follows the same rule: the JSON keeps
+bodies already stored and only fills URLs the register gained (or that
+still have an empty `jd`).
 
 | File                                   | Role                                                               |
 | -------------------------------------- | ------------------------------------------------------------------ |
 | `day-register/register/YYYY-MM-DD.txt` | The day’s list: `# date` / `# timezone`, URLs in 10s, `# count: N` |
+| `day-register/jd/YYYY-MM-DD.json`      | Optional (`--with-jd`): `[{url, jd}, …]` in register order         |
 
-No new URLs → the file is left as it is, and Slack is not called.
+No new URLs → the register is left as it is, Slack is not called, and
+`--with-jd` does not call the agent search again when every stored URL
+already has a body.
+
+`--from` skips the URL search. `--from --with-jd` still calls
+`GET /api/v1/agent/jobs/search` for any register URL that has no stored
+body — the export file has URLs only.
 
 ### Slack (`#plan_list`)
 
@@ -245,7 +254,7 @@ python export_job_urls.py --from-url "https://freehire.me/?work_mode=remote&coun
 Each script writes next to itself, not the current working directory, and creates its folder on first run:
 
 - `export_job_urls.py` → `exports/` (timestamped dumps)
-- `day_register.py` → `day-register/register/`
+- `day_register.py` → `day-register/register/` (and `day-register/jd/` with `--with-jd`)
 
 Generated files are gitignored; `.gitkeep` keeps the empty directories in version control.
 
@@ -271,11 +280,12 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 | `--new-only`        | Drop a `posted_at` bump. Default keeps bumps after the new postings          |
 | `--tz NAME`         | IANA timezone (default: `# timezone:` from `--from`, else `America/New_York`) |
 | `--tz-offset H`     | Hours east of UTC; overrides `--tz` and the export header                     |
-| `--from PATH`       | Read an export file instead of calling the API                                |
+| `--from PATH`       | Read an export file instead of the URL search. `--with-jd` still fetches missing bodies |
 | `--block-size N`    | URLs per paragraph (default 10)                                               |
 | `--slack`           | Post to Slack; fail if no webhook                                             |
 | `--no-slack`        | Do not post even if `DAY_REGISTER_SLACK_WEBHOOK` is set                       |
 | `--slack-webhook`   | Incoming Webhook URL (default: `$DAY_REGISTER_SLACK_WEBHOOK`)                 |
+| `--with-jd`         | Write `[{url, jd}, …]` to `day-register/jd/YYYY-MM-DD.json` (append-only; agent search) |
 
 ## Notes
 

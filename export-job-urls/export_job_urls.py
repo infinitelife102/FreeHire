@@ -36,6 +36,9 @@ from typing import Any, NamedTuple
 DEFAULT_BASE = "https://freehire.me"
 PAGE_SIZE = 100  # API max is 100
 MAX_WINDOW = 10_000  # API hard stop: offset + limit ≤ 10000
+SEARCH_PATH = "/api/v1/jobs/search"
+# Same filters as SEARCH_PATH; each hit carries the full posting body.
+AGENT_SEARCH_PATH = "/api/v1/agent/jobs/search"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 # Timestamped URL dumps from this script only (not the day-register folder).
@@ -407,6 +410,10 @@ class JobRow(NamedTuple):
     url: str
     posted_at: str  # RFC3339 from the API, or "" when the row has none
     created_at: str = ""  # first ingest time; empty on legacy two-column exports
+    title: str = ""
+    company: str = ""
+    public_slug: str = ""
+    description: str = ""  # full body only when fetched via AGENT_SEARCH_PATH
 
 
 def default_output_path(day: date | None = None) -> Path:
@@ -902,14 +909,30 @@ def add_filter_arguments(p: argparse.ArgumentParser) -> None:
     g.add_argument("--open-within-days", dest="open_within_days", default=None, metavar="N")
 
 
-def fetch_page(base: str, filters: dict[str, str], limit: int, offset: int) -> dict[str, Any]:
+def _job_str(job: dict[str, Any], key: str) -> str:
+    value = job.get(key) or ""
+    return value if isinstance(value, str) else str(value)
+
+
+def fetch_page(
+    base: str,
+    filters: dict[str, str],
+    limit: int,
+    offset: int,
+    *,
+    path: str = SEARCH_PATH,
+    extra: dict[str, str] | None = None,
+) -> dict[str, Any]:
     params = {**filters, "limit": str(limit), "offset": str(offset)}
-    url = f"{base.rstrip('/')}/api/v1/jobs/search?{urllib.parse.urlencode(params)}"
+    if extra:
+        params.update(extra)
+    url = f"{base.rstrip('/')}/{path.lstrip('/')}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(
         url,
         headers={"Accept": "application/json", "User-Agent": "freehire-export-job-urls/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    timeout = 90 if path.rstrip("/") == AGENT_SEARCH_PATH.rstrip("/") else 60
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -928,6 +951,8 @@ def collect_jobs(
     page_size: int = PAGE_SIZE,
     *,
     keep_utm: bool = False,
+    with_description: bool = False,
+    description_format: str = "text",
 ) -> tuple[list[JobRow], int]:
     rows: list[JobRow] = []
     offset = 0
@@ -935,17 +960,22 @@ def collect_jobs(
     keep_countries = requested_country_codes(filters)
     dropped_other_country = 0
 
+    path = AGENT_SEARCH_PATH if with_description else SEARCH_PATH
+    extra = {"description_format": description_format} if with_description else None
+
     print(
         "filters: " + urllib.parse.urlencode(filters).replace("%2C", ","),
         file=sys.stderr,
     )
+    if with_description:
+        print(f"descriptions: {path} format={description_format}", file=sys.stderr)
 
     while offset < MAX_WINDOW:
         limit = min(page_size, MAX_WINDOW - offset)
         if limit <= 0:
             break
         try:
-            body = fetch_page(base, filters, limit, offset)
+            body = fetch_page(base, filters, limit, offset, path=path, extra=extra)
         except urllib.error.HTTPError as e:
             raise SystemExit(
                 f"HTTP {e.code} at offset={offset}: {e.read().decode('utf-8', errors='replace')}"
@@ -972,17 +1002,18 @@ def collect_jobs(
             if location_names_other_country(loc, keep_countries):
                 dropped_other_country += 1
                 continue
-            posted = job.get("posted_at") or ""
-            if not isinstance(posted, str):
-                posted = str(posted)
-            created = job.get("created_at") or ""
-            if not isinstance(created, str):
-                created = str(created)
+            posted = _job_str(job, "posted_at")
+            created = _job_str(job, "created_at")
+            description = _job_str(job, "description") if with_description else ""
             rows.append(
                 JobRow(
                     url=u if keep_utm else strip_freehire_utm(u),
                     posted_at=posted,
                     created_at=created,
+                    title=_job_str(job, "title"),
+                    company=_job_str(job, "company"),
+                    public_slug=_job_str(job, "public_slug"),
+                    description=description,
                 )
             )
 

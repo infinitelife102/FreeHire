@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -15,16 +16,22 @@ from unittest.mock import patch
 from day_register import (
     SLACK_POST_GAP_SECONDS,
     SLACK_WEBHOOK_ENV,
+    format_jd,
     format_register,
     load_day_rows,
     load_dotenv,
     load_export_file,
+    load_jd_file,
+    merge_descriptions,
+    needs_description_fetch,
     new_rows,
+    plan_jd,
     plan_register,
     post_and_record,
     register_filename,
     resolve_slack_webhook,
     url_blocks,
+    use_cached_descriptions,
     write_text,
 )
 from export_job_urls import (
@@ -204,6 +211,40 @@ class LocationCountryFilterTests(unittest.TestCase):
         self.assertEqual(total, 3)
         self.assertEqual([r.url for r in rows], ["https://jobs.ashbyhq.com/acme/us"])
         self.assertEqual(rows[0].created_at, "2026-08-27T11:00:00Z")
+
+    def test_collect_jobs_keeps_full_description_from_agent_search(self) -> None:
+        page = {
+            "meta": {"total": 1},
+            "data": [
+                {
+                    "url": "https://jobs.ashbyhq.com/acme/us",
+                    "location": "Remote",
+                    "posted_at": "2026-08-27T12:00:00Z",
+                    "created_at": "2026-08-27T11:00:00Z",
+                    "title": "Backend Engineer",
+                    "company": "Acme",
+                    "public_slug": "backend-engineer-acme-1a2b",
+                    "description": "Build APIs in Go.\n\nRequirements:\n- 5 years",
+                }
+            ],
+        }
+        with patch("export_job_urls.fetch_page", return_value=page) as fetch:
+            with patch("sys.stderr", io.StringIO()):
+                rows, total = collect_jobs(
+                    "https://freehire.me",
+                    {"countries": "us"},
+                    page_size=100,
+                    with_description=True,
+                    description_format="text",
+                )
+        self.assertEqual(total, 1)
+        self.assertEqual(rows[0].title, "Backend Engineer")
+        self.assertEqual(rows[0].company, "Acme")
+        self.assertEqual(rows[0].public_slug, "backend-engineer-acme-1a2b")
+        self.assertIn("Build APIs in Go", rows[0].description)
+        kwargs = fetch.call_args.kwargs
+        self.assertEqual(kwargs["path"], "/api/v1/agent/jobs/search")
+        self.assertEqual(kwargs["extra"], {"description_format": "text"})
 
 
 class ParseExportHeaderTests(unittest.TestCase):
@@ -601,6 +642,106 @@ class RegisterFileTests(unittest.TestCase):
             "# date: 2026-09-01\n# timezone: America/New_York\n\n"
             "https://x.test/c\n\n# count: 1\n",
         )
+
+    def test_format_jd_is_url_and_jd_json(self) -> None:
+        text = format_jd(
+            [
+                JobRow(
+                    url="https://x.test/a",
+                    posted_at="2026-09-01T12:00:00Z",
+                    title="Backend Engineer",
+                    company="Acme",
+                    description="Build APIs in Go.",
+                )
+            ]
+        )
+        self.assertEqual(
+            json.loads(text),
+            [{"url": "https://x.test/a", "jd": "Build APIs in Go."}],
+        )
+
+    def test_merge_descriptions_matches_by_url(self) -> None:
+        rows = [JobRow("https://x.test/a", "2026-09-01T12:00:00Z")]
+        details = [
+            JobRow(
+                url="https://x.test/a",
+                posted_at="2026-09-01T12:00:00Z",
+                title="Backend Engineer",
+                company="Acme",
+                description="Build APIs.",
+            )
+        ]
+        merged = merge_descriptions(rows, details)
+        self.assertEqual(merged[0].description, "Build APIs.")
+        self.assertEqual(merged[0].title, "")
+
+    def test_merge_descriptions_keeps_row_when_url_missing(self) -> None:
+        rows = [JobRow("https://x.test/a", "2026-09-01T12:00:00Z", description="keep")]
+        merged = merge_descriptions(rows, [JobRow("https://x.test/b", "", description="other")])
+        self.assertEqual(merged, rows)
+
+    def test_merge_descriptions_does_not_overwrite_stored_body(self) -> None:
+        rows = [JobRow("https://x.test/a", "", description="stored")]
+        details = [JobRow("https://x.test/a", "", description="fresh")]
+        merged = merge_descriptions(rows, details)
+        self.assertEqual(merged[0].description, "stored")
+
+    def test_needs_description_fetch_skips_empty_list(self) -> None:
+        self.assertFalse(needs_description_fetch([]))
+        self.assertFalse(
+            needs_description_fetch([JobRow("https://x.test/a", "", description="body")])
+        )
+        self.assertTrue(needs_description_fetch([JobRow("https://x.test/a", "")]))
+
+    def test_plan_jd_keeps_stored_and_fills_gaps(self) -> None:
+        register = [
+            JobRow("https://x.test/a", ""),
+            JobRow("https://x.test/b", ""),
+            JobRow("https://x.test/c", ""),
+        ]
+        existing = [JobRow("https://x.test/a", "", description="old A")]
+        fetched = [
+            JobRow("https://x.test/b", "", description="new B"),
+            JobRow("https://x.test/d", "", description="dropped"),
+        ]
+        planned = plan_jd(register, existing, fetched)
+        self.assertEqual(
+            [(row.url, row.description) for row in planned],
+            [
+                ("https://x.test/a", "old A"),
+                ("https://x.test/b", "new B"),
+                ("https://x.test/c", ""),
+            ],
+        )
+
+    def test_use_cached_descriptions_requires_every_register_url(self) -> None:
+        prior = [JobRow("https://x.test/a", ""), JobRow("https://x.test/b", "")]
+        self.assertFalse(use_cached_descriptions([], []))
+        self.assertFalse(
+            use_cached_descriptions(prior, [JobRow("https://x.test/a", "", description="A")])
+        )
+        self.assertTrue(
+            use_cached_descriptions(
+                prior,
+                [
+                    JobRow("https://x.test/a", "", description="A"),
+                    JobRow("https://x.test/b", "", description="B"),
+                ],
+            )
+        )
+
+    def test_load_jd_file_reads_url_and_jd(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "2026-09-01.json"
+            self.assertEqual(load_jd_file(path), [])
+            write_text(
+                path,
+                json.dumps([{"url": "https://x.test/a", "jd": "Build APIs."}]) + "\n",
+            )
+            rows = load_jd_file(path)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0].url, "https://x.test/a")
+            self.assertEqual(rows[0].description, "Build APIs.")
 
     def test_write_text_replaces_and_leaves_no_tmp(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

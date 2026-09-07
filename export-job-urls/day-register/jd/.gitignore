@@ -1,0 +1,4 @@
+# Generated daily JD dumps — keep the directory, ignore the files.
+*
+!.gitkeep
+!.gitignore
