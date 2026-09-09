@@ -212,6 +212,27 @@ class LocationCountryFilterTests(unittest.TestCase):
         self.assertEqual([r.url for r in rows], ["https://jobs.ashbyhq.com/acme/us"])
         self.assertEqual(rows[0].created_at, "2026-08-27T11:00:00Z")
 
+    def test_collect_jobs_keeps_apply_url_as_returned(self) -> None:
+        page = {
+            "meta": {"total": 1},
+            "data": [
+                {
+                    "url": "https://www.whatjobs.com/job/123?utm_source=freehire.me",
+                    "location": "Remote",
+                    "posted_at": "2026-08-27T12:00:00Z",
+                }
+            ],
+        }
+        with patch("export_job_urls.fetch_page", return_value=page):
+            with patch("sys.stderr", io.StringIO()):
+                rows, _ = collect_jobs(
+                    "https://freehire.me", {"countries": "us"}, page_size=100
+                )
+        self.assertEqual(
+            rows[0].url,
+            "https://www.whatjobs.com/job/123?utm_source=freehire.me",
+        )
+
     def test_collect_jobs_keeps_full_description_from_agent_search(self) -> None:
         page = {
             "meta": {"total": 1},

@@ -936,21 +936,11 @@ def fetch_page(
         return json.loads(resp.read().decode("utf-8"))
 
 
-def strip_freehire_utm(raw: str) -> str:
-    parts = urllib.parse.urlsplit(raw)
-    q = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
-    q = [(k, v) for k, v in q if not (k == "utm_source" and v == "freehire.me")]
-    return urllib.parse.urlunsplit(
-        (parts.scheme, parts.netloc, parts.path, urllib.parse.urlencode(q), parts.fragment)
-    )
-
-
 def collect_jobs(
     base: str,
     filters: dict[str, str],
     page_size: int = PAGE_SIZE,
     *,
-    keep_utm: bool = False,
     with_description: bool = False,
     description_format: str = "text",
 ) -> tuple[list[JobRow], int]:
@@ -1007,7 +997,7 @@ def collect_jobs(
             description = _job_str(job, "description") if with_description else ""
             rows.append(
                 JobRow(
-                    url=u if keep_utm else strip_freehire_utm(u),
+                    url=u,
                     posted_at=posted,
                     created_at=created,
                     title=_job_str(job, "title"),
@@ -1057,11 +1047,6 @@ def main() -> None:
     )
     p.add_argument("--base-url", default=DEFAULT_BASE, help=f"API origin (default: {DEFAULT_BASE})")
     p.add_argument("--page-size", type=int, default=PAGE_SIZE, help=f"page size 1–100 (default: {PAGE_SIZE})")
-    p.add_argument(
-        "--keep-utm",
-        action="store_true",
-        help="keep ?utm_source=freehire.me (stripped by default)",
-    )
     p.add_argument(
         "--print-filters",
         action="store_true",
@@ -1115,9 +1100,7 @@ def main() -> None:
         # Relative -o paths land in exports/, not the caller's cwd.
         out = EXPORT_DIR / out
 
-    rows, total = collect_jobs(
-        args.base_url, filters, args.page_size, keep_utm=args.keep_utm
-    )
+    rows, total = collect_jobs(args.base_url, filters, args.page_size)
     warn_if_window_truncated(total, rows, target, tz)
     if target is not None:
         rows, undated = filter_by_day(rows, target, tz, drop_bumps=args.new_only)

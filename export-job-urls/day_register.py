@@ -404,11 +404,6 @@ def main() -> None:
     p.add_argument("--base-url", default=DEFAULT_BASE, help=f"API origin (default: {DEFAULT_BASE})")
     p.add_argument("--page-size", type=int, default=PAGE_SIZE, help=f"page size 1–100 (default: {PAGE_SIZE})")
     p.add_argument(
-        "--keep-utm",
-        action="store_true",
-        help="keep ?utm_source=freehire.me (stripped by default)",
-    )
-    p.add_argument(
         "--slack",
         action="store_true",
         help="post new URLs to Slack (requires webhook; fails if missing)",
@@ -476,7 +471,6 @@ def main() -> None:
             args.base_url,
             filters,
             args.page_size,
-            keep_utm=args.keep_utm,
             with_description=with_description,
         )
         warn_if_window_truncated(api_total, rows, target, tz)
@@ -537,7 +531,6 @@ def main() -> None:
                 args.base_url,
                 search_filters(args, target, tz),
                 args.page_size,
-                keep_utm=args.keep_utm,
                 with_description=True,
             )
             jd_rows = merge_descriptions(jd_rows, details)

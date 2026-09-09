@@ -265,7 +265,6 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 | `-o PATH`           | Output path (relative paths are under `exports/`)                                                        |
 | `--base-url URL`    | API origin (default `https://freehire.me`)                                                               |
 | `--page-size N`     | Page size 1–100 (default 100)                                                                            |
-| `--keep-utm`        | Keep `?utm_source=freehire.me`                                                                           |
 | `--print-filters`   | Print resolved filters, date, timezone, and `new_only`, then exit                                        |
 | `--date YYYY-MM-DD` | Keep this calendar day (default: yesterday, NY; `all` = no cut)                                          |
 | `--new-only`        | Drop a `posted_at` bump (`created_at` before that day). Default keeps bumps but lists them after new postings. Needs a calendar day — refused with `--date all` |
@@ -292,7 +291,7 @@ Generated files are gitignored; `.gitkeep` keeps the empty directories in versio
 - No auth — public search API.
 - Duplicate apply URLs are written once (stderr reports when dedup drops any).
 - Repeated query keys in `--from-url` / `-Q` (e.g. `skills=go&skills=rust`) are merged into a comma list.
-- Tracking UTM is stripped by default; ATS links work without it.
+- Apply URLs are stored as the API returned them (including `?utm_source=freehire.me`). WhatJobs needs that suffix.
 - API window limit: `offset + limit ≤ 10000`. Both scripts warn when the
   newest 10000 matches do not reach back to `--date`.
 
