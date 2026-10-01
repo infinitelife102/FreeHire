@@ -30,13 +30,13 @@ importers:
         version: 10.0.1(eslint@10.11.0(jiti@2.7.0))
       '@storybook/addon-themes':
         specifier: 10.5.10
-        version: 10.5.10(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))
+        version: 10.5.10(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))
       '@storybook/svelte':
         specifier: 10.5.10
-        version: 10.5.10(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))
+        version: 10.5.10(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))
       '@storybook/svelte-vite':
         specifier: 10.5.10
-        version: 10.5.10(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0)))(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
+        version: 10.5.10(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0)))(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
@@ -69,10 +69,10 @@ importers:
         version: 1.83.0
       storybook:
         specifier: 10.5.10
-        version: 10.5.10(prettier@3.9.6)(react@19.2.8)
+        version: 10.5.10(prettier@3.9.9)(react@19.2.8)
       style-dictionary:
-        specifier: ^5.5.3
-        version: 5.5.3
+        specifier: ^5.5.5
+        version: 5.5.5
       svelte:
         specifier: ^5.57.0
         version: 5.57.0(@typescript-eslint/types@8.70.0)
@@ -475,50 +475,50 @@ packages:
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-core@4.76.0':
-    resolution: {integrity: sha512-pXo9gYLUxLQfUDZG40an+VV1DA5hvAsspkfpuTpDTNMR9ZmIUo2QGKRQB5kwWjh5pPIXZXeTvS2au6Vp7DurAg==}
+  '@jsonjoy.com/fs-core@4.79.0':
+    resolution: {integrity: sha512-bxSwMrDY71OjEdj2mAYBxSe4BnHtAOjOxqUoFJc0WsllcGgA8iYl6wRF+4aVdFUjjEyHfBwxVv0QqW4AweIUZw==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-fsa@4.76.0':
-    resolution: {integrity: sha512-CTcvtizrAnr0zNkroYRpPoqAHWoNm8WNBVn1LJTdKka4G7Yho8cV1qdQpfSWOVcIcKF7VuOqfNvvMx4YUoeBDQ==}
+  '@jsonjoy.com/fs-fsa@4.79.0':
+    resolution: {integrity: sha512-EdadmStAvZw4jYg4iW3mDxBmzMFSI8jcHQkSl+rIQIO7dWbPdXaB83PBQhNCCtMBeX7zwcOFjpp0ecXqbYbjUA==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-node-builtins@4.76.0':
-    resolution: {integrity: sha512-yA+MnjUomZsXL3m4FXeDoS45s58k+3NrxEMYVZaBMnIIqhFs1hdz5+pTTPUPClqSgH87LIGq6nitDZq+T8ImJQ==}
+  '@jsonjoy.com/fs-node-builtins@4.79.0':
+    resolution: {integrity: sha512-LoBHewVHp/bZQ8Om1Iivl6NEHg7Mmby9kXJZysfnHYW4256rzXFSEcEpto1qgSAka+sq2v4N/Cnl562Z15MByA==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-node-to-fsa@4.76.0':
-    resolution: {integrity: sha512-yZhyt2W1DKI+QKv1fN/YsJ36PU9nqfUstU3dRF2BM3jnc9abfT0ri6u+E/r2BdmZ3PyIq9H+b5FDxwST/H3OUw==}
+  '@jsonjoy.com/fs-node-to-fsa@4.79.0':
+    resolution: {integrity: sha512-xFza/t81sVL4rik7h3SlcymC6X7pvNllI88LW1GESEANDXinf5lZoqju59i3AsGLyy4i0eBQvPiizWSMwCunQA==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-node-utils@4.76.0':
-    resolution: {integrity: sha512-xjxvUNDqklDrGh3bhkVQ/IQZd8+XUYXUU1emRBan+gYvePf+H2mWB33JxKgOQ59x2sJuokjUq7mA4b6PlYwatw==}
+  '@jsonjoy.com/fs-node-utils@4.79.0':
+    resolution: {integrity: sha512-Rj/WevHB8DV8VyEvFGSvDD3m3JHOVk3fO1biH26iworL9/rqdUMKQQeyiKTLbdf3Z9s9vVZnn8ZC0FWZgtO2mg==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-node@4.76.0':
-    resolution: {integrity: sha512-ongwZm58vGpi1Ibmib4eMsbif6pRvARvdQnnJ0Y8BqnZGNmyoIADoZlAVG3bWz1kAG3cBnYZLiTE9qoXFvkCcg==}
+  '@jsonjoy.com/fs-node@4.79.0':
+    resolution: {integrity: sha512-/k18aT1X+A2yLdlTe3WKpL5y2qrvbcUY1BXA4A+s8fBfTeXfi+xdvEB85JVXVf2i9kzASQZFx8dHw9OchgMUhQ==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-print@4.76.0':
-    resolution: {integrity: sha512-zZYQ8XHZs2EqAE4gzvykcxgR1r5DOPwc9bg3j0LKLFeUr7Ak8CJsZXC0zhnxIH14XYZh4WAu+GburaKppKO8fA==}
+  '@jsonjoy.com/fs-print@4.79.0':
+    resolution: {integrity: sha512-Bp5Q+OV1Dnl8oKf8hVhmboeI+NWbWRk1GxtJzuRvopDeNBDBh0RLevEsfnOVtwBwgRZaptSXn3e/mm3kbOzfDw==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/fs-snapshot@4.76.0':
-    resolution: {integrity: sha512-W0zFE+Cr1JRSIePN6pukCXqtzqu5sCZL4QXLb1FdYxUhqtpkPVXc12gbBlJg5k+bPTHihmCe3LDFu61siD9IBg==}
+  '@jsonjoy.com/fs-snapshot@4.79.0':
+    resolution: {integrity: sha512-/GY+eMvOl4ZQHUnrKYjC/t3N0BImBg7zv/cAGm3kiwUfqSQuo87jtbjmD3mzgQMv16K8zttkHE2wT9GaVsehvA==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
@@ -1478,8 +1478,8 @@ packages:
   '@webcontainer/env@1.1.1':
     resolution: {integrity: sha512-6aN99yL695Hi9SuIk1oC88l9o0gmxL1nGWWQ/kNy81HigJ0FoaoTXpytCj6ItzgyCEwA9kF1wixsTuv5cjsgng==}
 
-  '@zip.js/zip.js@2.14.1':
-    resolution: {integrity: sha512-ChDAOmIvj061bWlm6Zqy5llk3V2SSES893DT9CSeiLd+YGgm5l950F/HvUpKj5ED0nqfE+cgDgFuxqVQvTMatg==}
+  '@zip.js/zip.js@2.18.2':
+    resolution: {integrity: sha512-J1jwg0Kv5Aab50VlVZ6hp2rzGL/J0YLjBnkF6oJoIjmpxx9+tHgjRELGKryKnDZEcGXKjv7ibwxAziFiWHdR2A==}
     engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
 
   acorn-jsx@5.3.2:
@@ -1884,8 +1884,8 @@ packages:
     resolution: {integrity: sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A==}
     engines: {node: '>=10.13.0'}
 
-  glob-to-regex.js@1.2.0:
-    resolution: {integrity: sha512-QMwlOQKU/IzqMUOAZWubUOT8Qft+Y0KQWnX9nK3ch0CJg0tTp4TvGZsTfudYKv2NzoQSyPcnA6TYeIQ3jGichQ==}
+  glob-to-regex.js@1.3.1:
+    resolution: {integrity: sha512-zhWhMRsgnOym+1txhUmYJGD6eUsbUdrZv55gCYKuJX8t2p3+M8My23PD09bEIsreGUs5pnSa/idmcfp2/IlqGg==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
@@ -2252,8 +2252,8 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  memfs@4.76.0:
-    resolution: {integrity: sha512-g2rDa/iTAM+vuzCdFgYy4lRvTLGR3vrrWtyv2971iviMtdCplYaPlwdo/W0VcRjPk6iWxLvTUbM6zvUFDelAVg==}
+  memfs@4.79.0:
+    resolution: {integrity: sha512-vDFqA9WSa//xa3XIKwMmVqxgWWft4PMKW0k69gBM2rYOzZ3VqL9BrK3Kyl45jSxS7qImDgwejZzEb/xDWhP37g==}
 
   min-indent@1.0.1:
     resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}
@@ -2423,8 +2423,8 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier@3.9.6:
-    resolution: {integrity: sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==}
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -2581,8 +2581,8 @@ packages:
     resolution: {integrity: sha512-laJTa3Jb+VQpaC6DseHhF7dXVqHTfJPCRDaEbid/drOhgitgYku/letMUqOXFoWV0zIIUbjpdH2t+tYj4bQMRQ==}
     engines: {node: '>=8'}
 
-  style-dictionary@5.5.3:
-    resolution: {integrity: sha512-vt4wLw+3H47XLW5Awvq//FqV2BUMElGdhmuUapi2oXNERY4tjFJ6Cd+G3HYjV+9JWYHNFPbmDWwLN8wHzpaEkQ==}
+  style-dictionary@5.5.5:
+    resolution: {integrity: sha512-BG+o8U7MUcU6iLUtl1OWApF9hmfTSJcrhY6iWdXDU9xjt7VMZOHQMTsGx5AvsHyytWmeWybP2LzQxIKHUm9Svg==}
     engines: {node: '>=22.0.0'}
     hasBin: true
 
@@ -2874,8 +2874,8 @@ packages:
     resolution: {integrity: sha512-ohjk1mdUebJVadRt3bAhQhx8lSnISq+GDttK79LFl8EHQkAPvzwctoasC4hs8tBt6kLAncBWWyq1N52qEfKvDw==}
     engines: {node: ^22.14.0 || >=24.0.0}
 
-  which-typed-array@1.1.22:
-    resolution: {integrity: sha512-fvO4ExWMFsqyhG3AiPAObMuY1lxaqgYcxbc49CNdWDDECOJNgQyvsOWVwbZc+qf3rzRtxojBK+CMEv0Ld5CYpw==}
+  which-typed-array@1.1.24:
+    resolution: {integrity: sha512-wk4Mf4pR5mRP7eYuuTBCIQ9d0ud2Fv2jRLQpfgnRjbOxAFHmjKFValgTpitVKzJJS8ajnYQV2Du1SZ8j6b/EUQ==}
     engines: {node: '>= 0.4'}
 
   which@2.0.2:
@@ -2978,7 +2978,7 @@ snapshots:
       assert: 2.1.0
       buffer: 6.0.3
       events: 3.3.0
-      memfs: 4.76.0
+      memfs: 4.79.0
       path: 0.12.7
       stream: 0.0.3
       util: 0.12.5
@@ -3226,59 +3226,59 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-core@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-core@4.79.0(tslib@2.8.1)':
     dependencies:
-      '@jsonjoy.com/fs-node-builtins': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-builtins': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
       thingies: 2.6.1(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-fsa@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-fsa@4.79.0(tslib@2.8.1)':
     dependencies:
-      '@jsonjoy.com/fs-core': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-builtins': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-core': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-builtins': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
       thingies: 2.6.1(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-node-builtins@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-node-builtins@4.79.0(tslib@2.8.1)':
     dependencies:
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-node-to-fsa@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-node-to-fsa@4.79.0(tslib@2.8.1)':
     dependencies:
-      '@jsonjoy.com/fs-fsa': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-builtins': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-fsa': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-builtins': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-node-utils@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-node-utils@4.79.0(tslib@2.8.1)':
     dependencies:
-      '@jsonjoy.com/fs-node-builtins': 4.76.0(tslib@2.8.1)
-      glob-to-regex.js: 1.2.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-builtins': 4.79.0(tslib@2.8.1)
+      glob-to-regex.js: 1.3.1(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-node@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-node@4.79.0(tslib@2.8.1)':
     dependencies:
-      '@jsonjoy.com/fs-core': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-builtins': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-print': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-snapshot': 4.76.0(tslib@2.8.1)
-      glob-to-regex.js: 1.2.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-core': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-builtins': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-print': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-snapshot': 4.79.0(tslib@2.8.1)
+      glob-to-regex.js: 1.3.1(tslib@2.8.1)
       thingies: 2.6.1(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-print@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-print@4.79.0(tslib@2.8.1)':
     dependencies:
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
       tree-dump: 1.1.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/fs-snapshot@4.76.0(tslib@2.8.1)':
+  '@jsonjoy.com/fs-snapshot@4.79.0(tslib@2.8.1)':
     dependencies:
       '@jsonjoy.com/buffers': 17.67.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
       '@jsonjoy.com/json-pack': 17.67.0(tslib@2.8.1)
       '@jsonjoy.com/util': 17.67.0(tslib@2.8.1)
       tslib: 2.8.1
@@ -3664,15 +3664,15 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.62.2':
     optional: true
 
-  '@storybook/addon-themes@10.5.10(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))':
+  '@storybook/addon-themes@10.5.10(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))':
     dependencies:
-      storybook: 10.5.10(prettier@3.9.6)(react@19.2.8)
+      storybook: 10.5.10(prettier@3.9.9)(react@19.2.8)
       ts-dedent: 2.3.0
 
-  '@storybook/builder-vite@10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))':
+  '@storybook/builder-vite@10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))':
     dependencies:
-      '@storybook/csf-plugin': 10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
-      storybook: 10.5.10(prettier@3.9.6)(react@19.2.8)
+      '@storybook/csf-plugin': 10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
+      storybook: 10.5.10(prettier@3.9.9)(react@19.2.8)
       ts-dedent: 2.3.0
       vite: 8.3.0(esbuild@0.28.2)(jiti@2.7.0)
     transitivePeerDependencies:
@@ -3680,9 +3680,9 @@ snapshots:
       - rollup
       - webpack
 
-  '@storybook/csf-plugin@10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))':
+  '@storybook/csf-plugin@10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))':
     dependencies:
-      storybook: 10.5.10(prettier@3.9.6)(react@19.2.8)
+      storybook: 10.5.10(prettier@3.9.9)(react@19.2.8)
       unplugin: 2.3.11
     optionalDependencies:
       esbuild: 0.28.2
@@ -3695,13 +3695,13 @@ snapshots:
     dependencies:
       react: 19.2.8
 
-  '@storybook/svelte-vite@10.5.10(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0)))(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))':
+  '@storybook/svelte-vite@10.5.10(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0)))(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))':
     dependencies:
-      '@storybook/builder-vite': 10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
-      '@storybook/svelte': 10.5.10(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))
+      '@storybook/builder-vite': 10.5.10(esbuild@0.28.2)(rollup@4.62.2)(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
+      '@storybook/svelte': 10.5.10(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))
       '@sveltejs/vite-plugin-svelte': 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.70.0))(vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0))
       magic-string: 0.30.21
-      storybook: 10.5.10(prettier@3.9.6)(react@19.2.8)
+      storybook: 10.5.10(prettier@3.9.9)(react@19.2.8)
       svelte: 5.57.0(@typescript-eslint/types@8.70.0)
       svelte2tsx: 0.7.61(svelte@5.57.0(@typescript-eslint/types@8.70.0))(typescript@5.9.3)
       typescript: 5.9.3
@@ -3711,9 +3711,9 @@ snapshots:
       - rollup
       - webpack
 
-  '@storybook/svelte@10.5.10(storybook@10.5.10(prettier@3.9.6)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))':
+  '@storybook/svelte@10.5.10(storybook@10.5.10(prettier@3.9.9)(react@19.2.8))(svelte@5.57.0(@typescript-eslint/types@8.70.0))':
     dependencies:
-      storybook: 10.5.10(prettier@3.9.6)(react@19.2.8)
+      storybook: 10.5.10(prettier@3.9.9)(react@19.2.8)
       svelte: 5.57.0(@typescript-eslint/types@8.70.0)
       ts-dedent: 2.3.0
       type-fest: 5.9.0
@@ -3984,7 +3984,7 @@ snapshots:
 
   '@webcontainer/env@1.1.1': {}
 
-  '@zip.js/zip.js@2.14.1': {}
+  '@zip.js/zip.js@2.18.2': {}
 
   acorn-jsx@5.3.2(acorn@8.18.0):
     dependencies:
@@ -4408,7 +4408,7 @@ snapshots:
     dependencies:
       is-glob: 4.0.3
 
-  glob-to-regex.js@1.2.0(tslib@2.8.1):
+  glob-to-regex.js@1.3.1(tslib@2.8.1):
     dependencies:
       tslib: 2.8.1
 
@@ -4519,7 +4519,7 @@ snapshots:
 
   is-typed-array@1.1.15:
     dependencies:
-      which-typed-array: 1.1.22
+      which-typed-array: 1.1.24
 
   is-wsl@3.1.1:
     dependencies:
@@ -4703,19 +4703,19 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  memfs@4.76.0:
+  memfs@4.79.0:
     dependencies:
-      '@jsonjoy.com/fs-core': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-fsa': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-builtins': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-to-fsa': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-node-utils': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-print': 4.76.0(tslib@2.8.1)
-      '@jsonjoy.com/fs-snapshot': 4.76.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-core': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-fsa': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-builtins': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-to-fsa': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-node-utils': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-print': 4.79.0(tslib@2.8.1)
+      '@jsonjoy.com/fs-snapshot': 4.79.0(tslib@2.8.1)
       '@jsonjoy.com/json-pack': 1.21.0(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)
-      glob-to-regex.js: 1.2.0(tslib@2.8.1)
+      glob-to-regex.js: 1.3.1(tslib@2.8.1)
       thingies: 2.6.1(tslib@2.8.1)
       tree-dump: 1.1.0(tslib@2.8.1)
       tslib: 2.8.1
@@ -4915,7 +4915,7 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier@3.9.6: {}
+  prettier@3.9.9: {}
 
   pretty-format@27.5.1:
     dependencies:
@@ -5087,7 +5087,7 @@ snapshots:
 
   std-env@4.2.0: {}
 
-  storybook@10.5.10(prettier@3.9.6)(react@19.2.8):
+  storybook@10.5.10(prettier@3.9.9)(react@19.2.8):
     dependencies:
       '@storybook/global': 5.0.0
       '@storybook/icons': 2.1.0(react@19.2.8)
@@ -5107,7 +5107,7 @@ snapshots:
       use-sync-external-store: 1.6.0(react@19.2.8)
       ws: 8.21.3
     optionalDependencies:
-      prettier: 3.9.6
+      prettier: 3.9.9
     transitivePeerDependencies:
       - bufferutil
       - react
@@ -5125,12 +5125,12 @@ snapshots:
     dependencies:
       min-indent: 1.0.1
 
-  style-dictionary@5.5.3:
+  style-dictionary@5.5.5:
     dependencies:
       '@bundled-es-modules/deepmerge': 4.3.2
       '@bundled-es-modules/glob': 13.0.6
       '@bundled-es-modules/memfs': 4.17.0
-      '@zip.js/zip.js': 2.14.1
+      '@zip.js/zip.js': 2.18.2
       chalk: 5.6.2
       change-case: 5.4.4
       colorjs.io: 0.5.2
@@ -5138,7 +5138,7 @@ snapshots:
       is-plain-obj: 4.1.0
       json5: 2.2.3
       path-unified: 0.2.0
-      prettier: 3.9.6
+      prettier: 3.9.9
       tinycolor2: 1.6.0
 
   svelte-check@4.7.6(picomatch@4.0.7)(svelte@5.57.0(@typescript-eslint/types@8.70.0))(typescript@6.0.3):
@@ -5310,7 +5310,7 @@ snapshots:
       is-arguments: 1.2.0
       is-generator-function: 1.1.2
       is-typed-array: 1.1.15
-      which-typed-array: 1.1.22
+      which-typed-array: 1.1.24
 
   vite@8.3.0(esbuild@0.28.2)(jiti@2.7.0):
     dependencies:
@@ -5375,7 +5375,7 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
-  which-typed-array@1.1.22:
+  which-typed-array@1.1.24:
     dependencies:
       available-typed-arrays: 1.0.7
       call-bind: 1.0.9
