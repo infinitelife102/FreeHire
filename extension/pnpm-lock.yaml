@@ -70,8 +70,8 @@ importers:
         specifier: ^4.7.8
         version: 4.7.8(picomatch@4.0.7)(svelte@5.57.3(@typescript-eslint/types@8.72.2))(typescript@5.9.3)
       svelte-eslint-parser:
-        specifier: ^1.8.0
-        version: 1.8.0(svelte@5.57.3(@typescript-eslint/types@8.72.2))
+        specifier: ^1.10.1
+        version: 1.10.1(svelte@5.57.3(@typescript-eslint/types@8.72.2))
       tailwindcss:
         specifier: ^4.3.5
         version: 4.3.5
@@ -641,8 +641,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@rolldown/pluginutils@1.1.0':
-    resolution: {integrity: sha512-K+NU2HDCEem4sClgHH4ZZXwdJeNFkJo+hRk479DIwdIviAPN2hFJH1KHHwg8CxHQXvi0M5XY4deTXINfIiSG6w==}
+  '@rolldown/pluginutils@1.1.1':
+    resolution: {integrity: sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -1033,11 +1033,6 @@ packages:
   css-what@8.0.0:
     resolution: {integrity: sha512-DH0Bqq3DNp5tdOReuNyAA+Ev4Y2GS5FMbZpeTLP6C4CDi0h5nL0BmUPChXw3o/qbHLDWHl49sbNqQVY7bMSDdw==}
     engines: {node: '>=20.19.0'}
-
-  cssesc@3.0.0:
-    resolution: {integrity: sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==}
-    engines: {node: '>=4'}
-    hasBin: true
 
   cssom@0.5.0:
     resolution: {integrity: sha512-iKuQcq+NdHqlAcwUY0o/HL69XQrUaQdMjmStJ8JFmUaiiQErlhrmuigkg/CU4E2J0IyUKUrMAgl36TvN67MqTw==}
@@ -1727,8 +1722,8 @@ packages:
     peerDependencies:
       postcss: ^8.4.29
 
-  postcss-selector-parser@7.1.6:
-    resolution: {integrity: sha512-7qASPzhKF2l2KLboRZux8CCTRMdGiV08vWmyKzPz22qZ7ZjQBOeY7rNzNoCLSUiftJ7HUq0GERHmxw/t0dCdMw==}
+  postcss-selector-parser@7.2.1:
+    resolution: {integrity: sha512-GwxlMgTTXwIom+ebC7an3k6RaJDwklRQQnfiXsLPGicu8FYV/k/+1/9YY2OU2+r938H2t4X0TDxoif+HP2rjzQ==}
     engines: {node: '>=4'}
 
   postcss@8.5.31:
@@ -1844,9 +1839,9 @@ packages:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: ^5.0.0 || ^6.0.0
 
-  svelte-eslint-parser@1.8.0:
-    resolution: {integrity: sha512-mikR1qwIVy3t5WthUoAXkMwxkXvabZP9FJgdx35Ei7EbGWmctva1Pih16Koeor/bdNNq8NXHlwKGS6NkYTawLg==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0, pnpm: 10.34.1}
+  svelte-eslint-parser@1.10.1:
+    resolution: {integrity: sha512-owYBhrNRp/m+hDaQCH0S683kc0TMFy2bB+qvsMQQZRsjSFD9xp/3FYgI8FZoOKA3xk62gwkUj1HpVek0p6WgNw==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0, pnpm: 10.34.6}
     peerDependencies:
       svelte: ^3.37.0 || ^4.0.0 || ^5.0.0
     peerDependenciesMeta:
@@ -2532,7 +2527,7 @@ snapshots:
   '@rolldown/binding-win32-x64-msvc@1.2.19':
     optional: true
 
-  '@rolldown/pluginutils@1.1.0': {}
+  '@rolldown/pluginutils@1.1.1': {}
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -2944,8 +2939,6 @@ snapshots:
 
   css-what@8.0.0: {}
 
-  cssesc@3.0.0: {}
-
   cssom@0.5.0: {}
 
   debug@4.4.3:
@@ -3044,7 +3037,7 @@ snapshots:
       postcss-load-config: 3.1.4(postcss@8.5.31)
       postcss-safe-parser: 7.0.1(postcss@8.5.31)
       semver: 7.8.5
-      svelte-eslint-parser: 1.8.0(svelte@5.57.3(@typescript-eslint/types@8.72.2))
+      svelte-eslint-parser: 1.10.1(svelte@5.57.3(@typescript-eslint/types@8.72.2))
     optionalDependencies:
       svelte: 5.57.3(@typescript-eslint/types@8.72.2)
     transitivePeerDependencies:
@@ -3560,13 +3553,12 @@ snapshots:
     dependencies:
       postcss: 8.5.31
 
-  postcss-scss@4.0.9(postcss@8.5.31):
+  postcss-scss@4.0.9(postcss@8.5.32):
     dependencies:
-      postcss: 8.5.31
+      postcss: 8.5.32
 
-  postcss-selector-parser@7.1.6:
+  postcss-selector-parser@7.2.1:
     dependencies:
-      cssesc: 3.0.0
       util-deprecate: 1.0.2
 
   postcss@8.5.31:
@@ -3611,7 +3603,7 @@ snapshots:
   rolldown@1.2.19:
     dependencies:
       '@oxc-project/types': 0.156.0
-      '@rolldown/pluginutils': 1.1.0
+      '@rolldown/pluginutils': 1.1.1
     optionalDependencies:
       '@rolldown/binding-android-arm-eabi': 1.2.19
       '@rolldown/binding-android-arm64': 1.2.19
@@ -3685,15 +3677,15 @@ snapshots:
     transitivePeerDependencies:
       - picomatch
 
-  svelte-eslint-parser@1.8.0(svelte@5.57.3(@typescript-eslint/types@8.72.2)):
+  svelte-eslint-parser@1.10.1(svelte@5.57.3(@typescript-eslint/types@8.72.2)):
     dependencies:
       eslint-scope: 8.4.0
       eslint-visitor-keys: 4.2.1
       espree: 10.4.0
-      postcss: 8.5.31
-      postcss-scss: 4.0.9(postcss@8.5.31)
-      postcss-selector-parser: 7.1.6
-      semver: 7.8.5
+      postcss: 8.5.32
+      postcss-scss: 4.0.9(postcss@8.5.32)
+      postcss-selector-parser: 7.2.1
+      semver: 7.8.6
     optionalDependencies:
       svelte: 5.57.3(@typescript-eslint/types@8.72.2)
 
