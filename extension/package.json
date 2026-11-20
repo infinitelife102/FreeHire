@@ -38,7 +38,7 @@
     "@wxt-dev/module-svelte": "^2.0.5",
     "eslint": "^10.14.0",
     "eslint-plugin-oxlint": "^1.93.0",
-    "eslint-plugin-svelte": "^3.22.0",
+    "eslint-plugin-svelte": "^3.24.1",
     "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
     "oxfmt": "0.77.0",
