@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@storybook/addon-themes": "10.6.5",
+    "@storybook/addon-themes": "10.6.7",
     "@storybook/svelte": "10.6.5",
     "@storybook/svelte-vite": "10.6.5",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
